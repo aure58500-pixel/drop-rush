@@ -21,6 +21,7 @@ import { AudioManager } from '../audio/AudioManager.js';
 import { MainMenu } from '../ui/MainMenu.js';
 import { PauseMenu } from '../ui/PauseMenu.js';
 import { HUD } from '../ui/HUD.js';
+import { computeMenuFraming } from '../ui/menuFraming.js';
 
 export const GameState = Object.freeze({ MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused' });
 
@@ -175,6 +176,8 @@ export class Game {
   startTraining() {
     this.audio.unlock();
     this.mainMenu.hide();
+    this.engine.camera.clearViewOffset();
+    this.menuFrame = null;
     this.hud.show();
     this.touch?.setVisible(true);
     this.state = GameState.PLAYING;
@@ -294,14 +297,33 @@ export class Game {
     const p = this.player.position;
     this.player.animator.update(dt, { speed: 0, grounded: true, vy: 0, crouched: false, aiming: false, pitch: 0 });
     const cam = this.engine.camera;
-    const radius = 4.2;
-    const yaw = this.player.facingYaw + 0.5 + Math.sin(this.menuOrbit) * 0.5;
-    cam.position.set(p.x + Math.sin(yaw) * radius, p.y + 1.6, p.z + Math.cos(yaw) * radius);
-    cam.lookAt(p.x + Math.cos(yaw) * 0.9, p.y + 1.1, p.z - Math.sin(yaw) * 0.9);
-    if (cam.fov !== 50) {
-      cam.fov = 50;
-      cam.updateProjectionMatrix();
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const MENU_FOV = 50;
+
+    // Frame the character inside the free area (measured at most twice a second).
+    this.menuFrameTimer = (this.menuFrameTimer ?? 0) - dt;
+    if (!this.menuFrame || this.menuFrameTimer <= 0 || this.menuFrameSize !== `${W}x${H}`) {
+      this.menuFrameTimer = 0.5;
+      this.menuFrameSize = `${W}x${H}`;
+      this.menuFrameTarget = computeMenuFraming(this.mainMenu.getFreeRect(), W, H, MENU_FOV);
+      if (!this.menuFrame) this.menuFrame = { ...this.menuFrameTarget };
     }
+    const f = this.menuFrame;
+    const t = this.menuFrameTarget;
+    const k = 1 - Math.exp(-6 * dt);
+    f.distance += (t.distance - f.distance) * k;
+    f.shiftX += (t.shiftX - f.shiftX) * k;
+    f.shiftY += (t.shiftY - f.shiftY) * k;
+
+    const yaw = this.player.facingYaw + 0.5 + Math.sin(this.menuOrbit) * 0.5;
+    const focusY = p.y + 0.95;
+    cam.position.set(p.x + Math.sin(yaw) * f.distance, focusY + 0.35, p.z + Math.cos(yaw) * f.distance);
+    cam.lookAt(p.x, focusY, p.z);
+    if (cam.fov !== MENU_FOV) cam.fov = MENU_FOV;
+    // Sliding the render window moves the character on screen without moving the camera.
+    cam.setViewOffset(W, H, -f.shiftX, -f.shiftY, W, H);
+    cam.updateProjectionMatrix();
     this.player.model.setVisible(true);
   }
 }

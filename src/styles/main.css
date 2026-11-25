@@ -273,6 +273,7 @@ body.is-touch .hud-status { left: auto; right: 50%; transform: translateX(50%); 
   .logo span { font-size: clamp(30px, 12vh, 70px); }
   /* Landscape layout: logo on the left, cards side by side on the right. */
   .main-menu { flex-direction: row; align-items: center; gap: 12px; }
+  .menu-header { align-self: flex-start; }
   .menu-body { margin: 0 0 0 auto; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
   .menu-card { width: min(270px, 100%); padding: 10px 12px; }
   .menu-card h2 { margin-bottom: 6px; font-size: 17px; }
@@ -309,4 +310,13 @@ body.is-touch .hud-status { left: auto; right: 50%; transform: translateX(50%); 
   .skin-grid { grid-template-columns: repeat(6, 1fr); }
   .skin-chip span { display: none; }
   .play-card .hint { display: none; }
+  /* Compact cards so the character stays visible between the logo and the cards. */
+  .menu-card { padding: 10px 12px; }
+  .menu-card h2 { display: none; }
+  .menu-footer { display: none; }
+  .play-card { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .play-card .btn-xl { flex: 1 1 100%; padding: 12px 16px; font-size: 18px; }
+  .play-card .btn-ghost { flex: 1 1 0; padding: 8px 10px; }
+  .field { margin-bottom: 6px; }
+  .field-error { min-height: 0; }
 }
