@@ -1,0 +1,307 @@
+// Game orchestrator: owns systems, game states (menu / playing / paused),
+// the main loop and the wiring between gameplay, rendering and UI.
+import { GAME_CONFIG } from '../config/gameConfig.js';
+import { loadMapDefinition } from '../config/maps/index.js';
+import { QUALITY_PRESETS } from '../config/graphicsConfig.js';
+import { TOUCH_SETTINGS } from '../config/controlsConfig.js';
+import { Engine } from './Engine.js';
+import { GameLoop } from './GameLoop.js';
+import { EventBus } from './EventBus.js';
+import { Settings } from './Settings.js';
+import { Profile } from './Profile.js';
+import { QualityManager } from './QualityManager.js';
+import { Input } from './input/Input.js';
+import { TouchControls } from './input/TouchControls.js';
+import { initKeyLabels, isTouchDevice } from './input/keyLabels.js';
+import { CollisionWorld } from './physics/CollisionWorld.js';
+import { GameMap } from '../map/GameMap.js';
+import { LocalPlayer } from '../player/LocalPlayer.js';
+import { ThirdPersonCamera } from '../player/ThirdPersonCamera.js';
+import { AudioManager } from '../audio/AudioManager.js';
+import { MainMenu } from '../ui/MainMenu.js';
+import { PauseMenu } from '../ui/PauseMenu.js';
+import { HUD } from '../ui/HUD.js';
+
+export const GameState = Object.freeze({ MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused' });
+
+export class Game {
+  constructor({ canvas, uiRoot }) {
+    this.canvas = canvas;
+    this.uiRoot = uiRoot;
+    this.state = GameState.MENU;
+    this.events = new EventBus();
+    this.menuOrbit = 0;
+    this.respawnTimer = 0;
+    this.crouchToggled = false;
+  }
+
+  async init(onProgress = () => {}) {
+    onProgress(0.05, 'Initialisation…');
+    await initKeyLabels();
+    this.isTouch = isTouchDevice();
+    document.body.classList.toggle('is-touch', this.isTouch);
+
+    this.settings = new Settings(this.events);
+    this.profile = new Profile();
+    this.engine = new Engine(this.canvas, { antialias: !this.isTouch });
+    this.input = new Input(this.canvas);
+    this.audio = new AudioManager(this.settings.get('volume'));
+
+    onProgress(0.2, 'Chargement de la carte…');
+    await this.loadMap(GAME_CONFIG.defaultMapId);
+    onProgress(0.75, 'Préparation du personnage…');
+
+    this.player = new LocalPlayer({
+      world: this.world,
+      queries: this.map.queries,
+      scene: this.engine.scene,
+      skinId: this.profile.skinId,
+      audio: this.audio,
+      events: this.events,
+    });
+    this.cameraRig = new ThirdPersonCamera(this.engine.camera, this.world);
+    this.spawnPlayer();
+
+    this.quality = new QualityManager({
+      settings: this.settings,
+      isTouch: this.isTouch,
+      apply: (preset) => this.applyQuality(preset),
+    });
+    this.quality.refresh();
+
+    this.createUI();
+    this.bindEvents();
+
+    onProgress(1, 'Prêt !');
+    this.loop = new GameLoop({
+      update: (dt) => this.update(dt),
+      render: () => this.engine.render(),
+      maxDeltaTime: GAME_CONFIG.maxDeltaTime,
+    });
+    this.loop.start();
+  }
+
+  async loadMap(id) {
+    const def = await loadMapDefinition(id);
+    this.world = new CollisionWorld({ cellSize: 8 });
+    this.map = new GameMap(def, { scene: this.engine.scene, world: this.world, killHeight: GAME_CONFIG.killHeight });
+  }
+
+  spawnPlayer() {
+    const spawn = this.map.spawnPoints[0];
+    this.player.spawn(spawn);
+    this.cameraRig.yaw = spawn.yaw;
+    this.cameraRig.pitch = -0.12;
+    this.cameraRig.snap();
+    this.crouchToggled = false;
+  }
+
+  applyQuality(preset) {
+    this.engine.setPixelRatioCap(preset.pixelRatio);
+    this.engine.setViewDistance(preset.viewDistance);
+    this.map.applyQuality(preset);
+  }
+
+  createUI() {
+    const fullscreen = () => this.toggleFullscreen();
+    this.mainMenu = new MainMenu(this.uiRoot, {
+      profile: this.profile,
+      settings: this.settings,
+      isTouch: this.isTouch,
+      onPlay: () => this.startTraining(),
+      onSkinChange: (id) => this.player.setSkin(id),
+      onFullscreen: fullscreen,
+      onUiSound: () => {
+        this.audio.unlock();
+        this.audio.play('click', { volume: 0.4 });
+      },
+    });
+    this.hud = new HUD(this.uiRoot, { isTouch: this.isTouch });
+    this.pauseMenu = new PauseMenu(this.uiRoot, {
+      settings: this.settings,
+      isTouch: this.isTouch,
+      onResume: () => this.resume(),
+      onQuit: () => this.quitToMenu(),
+      onFullscreen: fullscreen,
+    });
+    if (this.isTouch) {
+      this.touch = new TouchControls(this.uiRoot, this.input, { onPause: () => this.pause() });
+    }
+  }
+
+  bindEvents() {
+    this.events.on('settings:changed', ({ key, value }) => {
+      if (key === 'volume') this.audio.setVolume(value);
+      if (key === 'quality') this.quality.refresh();
+    });
+    this.events.on('player:eliminated', ({ reason }) => {
+      this.respawnTimer = GAME_CONFIG.trainingRespawnDelay;
+      const text = reason === 'outOfBounds' ? 'Vous êtes sorti de la carte.' : 'Vous avez été éliminé.';
+      this.hud.showElimination(text, this.respawnTimer);
+    });
+    this.input.onPointerLockChange = (locked) => {
+      if (this.state === GameState.PLAYING && !locked && !this.isTouch) this.pause();
+      if (locked) this.hud.setLockHint(false);
+    };
+    this.canvas.addEventListener('click', () => {
+      if (this.state === GameState.PLAYING && !this.isTouch && !this.input.pointerLocked) {
+        this.input.requestPointerLock();
+      }
+    });
+    window.addEventListener('beforeunload', (e) => {
+      // Protects against Ctrl+W (crouch + forward on AZERTY) closing the tab mid-game.
+      if (this.state !== GameState.MENU) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  }
+
+  async toggleFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+        // Keyboard Lock (Chrome/Edge, fullscreen only) lets the game receive Ctrl+W etc.
+        await navigator.keyboard?.lock?.().catch(() => {});
+      } else {
+        navigator.keyboard?.unlock?.();
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Fullscreen refused (iOS Safari on iPhone does not support it).
+    }
+  }
+
+  startTraining() {
+    this.audio.unlock();
+    this.mainMenu.hide();
+    this.hud.show();
+    this.touch?.setVisible(true);
+    this.state = GameState.PLAYING;
+    this.input.gameActive = true;
+    this.input.reset();
+    this.spawnPlayer();
+    this.hud.hideElimination();
+    if (!this.isTouch) {
+      this.input.requestPointerLock().then((ok) => this.hud.setLockHint(!ok));
+    }
+  }
+
+  pause() {
+    if (this.state !== GameState.PLAYING) return;
+    this.state = GameState.PAUSED;
+    this.input.reset();
+    this.touch?.setVisible(false);
+    this.pauseMenu.show();
+    this.input.exitPointerLock();
+  }
+
+  resume() {
+    if (this.state !== GameState.PAUSED) return;
+    this.pauseMenu.hide();
+    this.state = GameState.PLAYING;
+    this.input.reset();
+    this.touch?.setVisible(true);
+    if (!this.isTouch) {
+      this.input.requestPointerLock().then((ok) => this.hud.setLockHint(!ok));
+    }
+  }
+
+  quitToMenu() {
+    this.pauseMenu.hide();
+    this.hud.hide();
+    this.hud.hideElimination();
+    this.touch?.setVisible(false);
+    this.input.exitPointerLock();
+    this.input.gameActive = false;
+    this.state = GameState.MENU;
+    this.spawnPlayer();
+    this.mainMenu.show();
+  }
+
+  buildIntent() {
+    const move = this.input.getMove();
+    let crouch;
+    if (this.isTouch) crouch = this.touch.crouch;
+    else if (this.settings.get('crouchToggle')) {
+      if (this.input.wasPressed('crouch')) this.crouchToggled = !this.crouchToggled;
+      crouch = this.crouchToggled;
+    } else crouch = this.input.isDown('crouch');
+    return {
+      moveX: move.x,
+      moveY: move.y,
+      sprint: this.input.isDown('sprint') || move.analogSprint,
+      crouch,
+      jumpPressed: this.input.wasPressed('jump'),
+      aiming: this.isTouch ? this.touch.aim : this.input.isDown('aim'),
+    };
+  }
+
+  update(dt) {
+    const input = this.input;
+    this.quality.update(dt, this.state === GameState.PLAYING);
+
+    if (this.state === GameState.PLAYING) {
+      if (input.wasPressed('pause')) this.pause();
+      if (input.wasPressed('toggleHelp')) this.hud.toggleHelp();
+
+      const look = input.consumeLook();
+      this.cameraRig.applyLook(look.x, look.y, this.settings.get('mouseSensitivity'), this.settings.get('invertY'));
+      this.cameraRig.applyLook(look.touchX, look.touchY, TOUCH_SETTINGS.lookSensitivity, this.settings.get('invertY'));
+
+      const intent = this.buildIntent();
+      if (this.player.alive) {
+        this.player.update(dt, intent, this.cameraRig);
+      } else {
+        this.respawnTimer -= dt;
+        this.hud.showElimination('Vous êtes sorti de la carte.', this.respawnTimer);
+        if (this.respawnTimer <= 0) {
+          this.spawnPlayer();
+          this.hud.hideElimination();
+        }
+      }
+      const p = this.player.position;
+      this.cameraRig.update(dt, p, this.player.eyeHeight, intent.aiming && this.player.alive);
+      this.player.model.setVisible(this.player.alive && this.cameraRig.distanceToPivot > 0.7);
+
+      const showPerf = this.settings.get('showFps');
+      this.hud.update(dt, {
+        player: this.player,
+        aiming: intent.aiming,
+        boundaryDistance: this.map.queries.distanceToBoundary(p.x, p.z),
+        warningDistance: GAME_CONFIG.boundaryWarningDistance,
+        perf: showPerf ? {
+          fps: this.quality.fps,
+          quality: QUALITY_PRESETS[this.quality.level].label,
+          calls: this.engine.drawCalls,
+          triangles: this.engine.triangles,
+        } : null,
+      });
+    } else if (this.state === GameState.MENU) {
+      this.updateMenuCamera(dt);
+    } else if (this.state === GameState.PAUSED) {
+      input.consumeLook();
+      if (input.wasPressed('pause') && !this.isTouch) this.resume();
+    }
+
+    this.map.update(dt, this.engine.camera, this.player.position);
+    input.endFrame();
+  }
+
+  // Slow orbit around the idle character behind the main menu.
+  updateMenuCamera(dt) {
+    this.menuOrbit += dt * 0.12;
+    const p = this.player.position;
+    this.player.animator.update(dt, { speed: 0, grounded: true, vy: 0, crouched: false, aiming: false, pitch: 0 });
+    const cam = this.engine.camera;
+    const radius = 4.2;
+    const yaw = this.player.facingYaw + 0.5 + Math.sin(this.menuOrbit) * 0.5;
+    cam.position.set(p.x + Math.sin(yaw) * radius, p.y + 1.6, p.z + Math.cos(yaw) * radius);
+    cam.lookAt(p.x + Math.cos(yaw) * 0.9, p.y + 1.1, p.z - Math.sin(yaw) * 0.9);
+    if (cam.fov !== 50) {
+      cam.fov = 50;
+      cam.updateProjectionMatrix();
+    }
+    this.player.model.setVisible(true);
+  }
+}

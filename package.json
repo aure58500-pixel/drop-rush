@@ -1,0 +1,21 @@
+{
+  "name": "drop-rush",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Drop Rush - Battle Royale 3D multijoueur jouable dans le navigateur",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.178.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}
