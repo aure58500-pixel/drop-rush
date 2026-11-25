@@ -297,8 +297,7 @@ export class Game {
     const p = this.player.position;
     this.player.animator.update(dt, { speed: 0, grounded: true, vy: 0, crouched: false, aiming: false, pitch: 0 });
     const cam = this.engine.camera;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    const { width: W, height: H } = this.engine.viewSize;
     const MENU_FOV = 50;
 
     // Frame the character inside the free area (measured at most twice a second).

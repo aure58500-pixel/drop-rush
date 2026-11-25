@@ -17,6 +17,7 @@
 
 html, body {
   margin: 0;
+  width: 100%;
   height: 100%;
   overflow: hidden;
   background: var(--bg);
@@ -32,13 +33,14 @@ html, body {
 #game-canvas {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
   display: block;
   touch-action: none;
 }
 
+/* The page is pinned to the visible viewport: no scroll, no rubber-banding, no borders. */
+body { position: fixed; inset: 0; }
 #ui-root { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 #ui-root > * { pointer-events: auto; }
 .hidden { display: none !important; }
@@ -136,7 +138,9 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 28px; }
 .main-menu {
   display: flex;
   flex-direction: column;
-  padding: clamp(10px, min(4vw, 4vh), 48px);
+  --pad: clamp(10px, min(4vw, 4vh), 48px);
+  padding: max(var(--pad), env(safe-area-inset-top)) max(var(--pad), env(safe-area-inset-right))
+    max(var(--pad), env(safe-area-inset-bottom)) max(var(--pad), env(safe-area-inset-left));
   background: linear-gradient(90deg, rgba(10, 14, 36, 0) 0%, rgba(10, 14, 36, 0.15) 40%, rgba(10, 14, 36, 0.75) 100%);
   overflow-y: auto;
 }
@@ -169,7 +173,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 28px; }
 .skin-chip:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.1); }
 .skin-chip.selected { border-color: var(--accent); background: rgba(255, 209, 102, 0.14); }
 
-.modal { position: fixed; inset: 0; background: rgba(5, 8, 24, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); z-index: 20; }
+.modal { position: fixed; inset: 0; background: rgba(5, 8, 24, 0.6); display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); backdrop-filter: blur(4px); z-index: 20; }
 .modal-card, .pause-card {
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
   padding: 24px; width: min(460px, 100%); max-height: 90vh; max-height: 90dvh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
@@ -208,16 +212,16 @@ kbd { font: 800 13px var(--font); padding: 5px 9px; border-radius: 7px; backgrou
 .crosshair b { position: absolute; width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
 .crosshair.aiming i { background: var(--accent); }
 
-.hud-status { position: absolute; left: 24px; bottom: 24px; display: flex; gap: 8px; }
+.hud-status { position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
 .status-chip, .water-chip { padding: 8px 14px; border-radius: 99px; background: var(--panel); border: 1px solid var(--panel-border); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
 .status-chip[data-status='sprint'] { color: var(--accent); }
 .status-chip[data-status='crouch'] { color: var(--blue); }
 .water-chip { color: var(--blue); }
 
-.perf-panel { position: absolute; right: 16px; top: 16px; white-space: pre; font: 600 12px/1.5 ui-monospace, Menlo, Consolas, monospace; background: rgba(0, 0, 0, 0.45); padding: 10px 12px; border-radius: 10px; }
+.perf-panel { position: absolute; right: max(16px, env(safe-area-inset-right)); top: max(16px, env(safe-area-inset-top)); white-space: pre; font: 600 12px/1.5 ui-monospace, Menlo, Consolas, monospace; background: rgba(0, 0, 0, 0.45); padding: 10px 12px; border-radius: 10px; }
 .boundary-warning { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); padding: 12px 22px; border-radius: 12px; background: rgba(239, 71, 111, 0.85); font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; animation: pulse 1s ease-in-out infinite; }
-.help-panel { position: absolute; right: 16px; bottom: 70px; width: 300px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 14px; }
-.help-hint { position: absolute; right: 16px; bottom: 24px; font-size: 13px; color: rgba(255, 255, 255, 0.8); }
+.help-panel { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 70px; width: 300px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 14px; }
+.help-hint { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); font-size: 13px; color: rgba(255, 255, 255, 0.8); }
 .lock-hint { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); padding: 12px 20px; border-radius: 12px; background: var(--panel); font-weight: 700; }
 .elimination { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(120, 0, 20, 0.15), rgba(60, 0, 10, 0.65)); }
 .elim-card { text-align: center; animation: pop 0.3s ease both; }

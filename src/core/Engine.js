@@ -26,6 +26,8 @@ export class Engine {
     this._onResize = () => this.resize();
     window.addEventListener('resize', this._onResize);
     window.visualViewport?.addEventListener('resize', this._onResize);
+    window.addEventListener('orientationchange', () => setTimeout(this._onResize, 250));
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(this._onResize).observe(canvas);
     this.resize();
   }
 
@@ -39,9 +41,15 @@ export class Engine {
     this.camera.updateProjectionMatrix();
   }
 
+  // Drawing buffer size always follows the canvas box actually shown on screen.
+  get viewSize() {
+    const width = this.canvas.clientWidth || window.innerWidth;
+    const height = this.canvas.clientHeight || window.innerHeight;
+    return { width, height };
+  }
+
   resize() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const { width, height } = this.viewSize;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioCap));
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / Math.max(1, height);

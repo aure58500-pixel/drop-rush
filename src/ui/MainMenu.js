@@ -100,8 +100,8 @@ export class MainMenu {
 
   // Screen rectangle (pixels) not covered by the logo or the cards.
   getFreeRect() {
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    const W = this.root.clientWidth || window.innerWidth;
+    const H = this.root.clientHeight || window.innerHeight;
     const header = this.root.querySelector('.menu-header').getBoundingClientRect();
     const body = this.root.querySelector('.menu-body').getBoundingClientRect();
     // Candidate A: column on the left of the cards, below the logo (wide screens).
