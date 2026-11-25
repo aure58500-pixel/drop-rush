@@ -18,6 +18,10 @@ export class TouchControls {
       <div class="touch-zone touch-zone-look"></div>
       <div class="joystick hidden"><div class="joystick-knob"></div></div>
       <button class="touch-btn touch-pause" data-action="pause" aria-label="Pause">❚❚</button>
+      <div class="touch-combat">
+        <button class="touch-btn touch-fire" data-action="fire" data-mode="hold" data-look="1">Tirer</button>
+        <button class="touch-btn touch-reload" data-action="reload" data-mode="tap">Recharger</button>
+      </div>
       <div class="touch-buttons">
         <button class="touch-btn touch-aim" data-action="aim">Viser</button>
         <button class="touch-btn touch-crouch" data-action="crouch">Accroupir</button>
@@ -35,6 +39,8 @@ export class TouchControls {
     this.knob = this.el.querySelector('.joystick-knob');
     this.buildPanel = this.el.querySelector('.touch-build-panel');
     this.buildButton = this.el.querySelector('.touch-build');
+    this.combatPanel = this.el.querySelector('.touch-combat');
+    this.fireButton = this.el.querySelector('.touch-fire');
     this.el.style.setProperty('--touch-btn-min', `${this.cfg.minButtonSize}px`);
 
     const moveZone = this.el.querySelector('.touch-zone-move');
@@ -51,6 +57,11 @@ export class TouchControls {
         e.preventDefault();
         e.stopPropagation();
         btn.classList.add('active');
+        // The fire button also steers the camera while held (drag to aim).
+        if (btn.dataset.look) {
+          this.lookIds.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          this.firePointer = e.pointerId;
+        }
         if (action === 'pause') onPause();
         else if (action === 'crouch') {
           this.crouchToggled = !this.crouchToggled;
@@ -70,7 +81,8 @@ export class TouchControls {
       };
       btn.addEventListener('pointerup', release);
       btn.addEventListener('pointercancel', release);
-      btn.addEventListener('pointerleave', release);
+      // A held button keeps firing while the finger slides off it to aim.
+      if (!btn.dataset.look) btn.addEventListener('pointerleave', release);
     }
   }
 
@@ -83,9 +95,15 @@ export class TouchControls {
   setBuildMode(active) {
     this.buildPanel.classList.toggle('hidden', !active);
     this.buildButton.classList.toggle('toggled', active);
+    this.combatPanel.classList.toggle('hidden', active);
+    if (active) this.input.releaseVirtual('fire');
   }
 
+
+
   resetState() {
+    this.firePointer = null;
+    this.input.releaseVirtual('fire');
     this.joystickId = null;
     this.lookIds.clear();
     this.joystick.classList.add('hidden');
@@ -160,5 +178,10 @@ export class TouchControls {
       this.input.setVirtualMove(0, 0, false);
     }
     this.lookIds.delete(e.pointerId);
+    if (e.pointerId === this.firePointer) {
+      this.firePointer = null;
+      this.input.releaseVirtual('fire');
+      this.fireButton.classList.remove('active');
+    }
   }
 }

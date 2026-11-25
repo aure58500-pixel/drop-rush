@@ -27,8 +27,17 @@ export class GameLoop {
     const dt = Math.min(Math.max((now - this.lastTime) / 1000, 0), this.maxDeltaTime);
     this.lastTime = now;
     this.elapsed += dt;
-    this.update(dt, this.elapsed);
-    this.render(dt);
+    // Schedule first: a bug in one frame must not freeze the whole game.
     this.handle = requestAnimationFrame(this._frame);
+    try {
+      this.update(dt, this.elapsed);
+      this.render(dt);
+    } catch (error) {
+      if (now - (this.lastErrorTime || 0) > 2000) {
+        this.lastErrorTime = now;
+        console.error('Erreur dans la boucle de jeu :', error);
+      }
+      this.onError?.(error);
+    }
   }
 }

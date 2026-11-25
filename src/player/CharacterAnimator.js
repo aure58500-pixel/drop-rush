@@ -91,15 +91,7 @@ export class CharacterAnimator {
       t.spineX = 0.04 + runT * 0.28 + Math.sin(this.time * 2) * 0.012 * (1 - walkT);
     }
 
-    if (s.aiming) {
-      const pitch = clamp(s.pitch, -1.2, 1.2);
-      t.armRx = -1.5 - pitch;
-      t.armRz = 0.05;
-      t.elbowR = -0.15;
-      t.armLx = -1.35 - pitch;
-      t.armLz = -0.45;
-      t.elbowL = -0.5;
-    }
+    this._weaponPose(t, s, runT);
     t.neckX = -clamp(s.pitch, -1, 1) * 0.35 - (s.crouched ? 0.3 : 0) - runT * 0.15;
 
     this.landImpulse = Math.max(0, this.landImpulse - dt * 5);
@@ -108,6 +100,75 @@ export class CharacterAnimator {
     const rate = s.grounded ? 16 : 10;
     for (const k of JOINT_KEYS) this.pose[k] = damp(this.pose[k], t[k], rate, dt);
     this._apply();
+  }
+
+  // Arms with a weapon. s.hold: 'rifle' | 'pistol' | 'shoulder' | null,
+  // s.stance: aiming or just fired (weapon along the camera direction),
+  // s.reload: 0..1 progress or -1, s.recoil: 0..1 kick.
+  _weaponPose(t, s, runT) {
+    const pitch = clamp(s.pitch, -1.2, 1.2);
+    const stance = s.aiming || s.stance;
+    if (!s.hold) {
+      if (stance) {
+        t.armRx = -1.5 - pitch;
+        t.armRz = 0.05;
+        t.elbowR = -0.15;
+      }
+      return;
+    }
+    const twoHands = s.hold !== 'pistol';
+    if (s.reload >= 0) {
+      const k = s.reload;
+      t.armRx = -0.75;
+      t.armRz = 0.15;
+      t.elbowR = -0.7;
+      t.armLx = -0.7 + Math.sin(k * Math.PI * 3) * 0.35;
+      t.armLz = -0.55;
+      t.elbowL = -1.1;
+      this.weaponRoll = Math.sin(k * Math.PI) * 0.7;
+      return;
+    }
+    this.weaponRoll = 0;
+    if (stance) {
+      t.armRx = -Math.PI / 2 - pitch;
+      t.armRz = 0.14;
+      t.elbowR = 0;
+      if (twoHands) {
+        t.armLx = -1.3 - pitch;
+        t.armLz = -0.62;
+        t.elbowL = -0.55;
+      } else {
+        t.armLx = -1.45 - pitch;
+        t.armLz = -0.42;
+        t.elbowL = -0.1;
+      }
+      t.armRx -= s.recoil * 0.22;
+      t.armLx -= s.recoil * 0.15;
+      t.spineX -= s.recoil * 0.05;
+      return;
+    }
+    if (s.sprinting && twoHands) {
+      // Weapon held across the chest while sprinting.
+      t.armRx = -0.35;
+      t.armRz = 0.2;
+      t.elbowR = -1.25;
+      t.armLx = -0.85;
+      t.armLz = -0.65;
+      t.elbowL = -1.0;
+      return;
+    }
+    if (twoHands) {
+      t.armRx = -0.55 - runT * 0.1;
+      t.armRz = 0.12;
+      t.elbowR = -0.85;
+      t.armLx = -0.95;
+      t.armLz = -0.6;
+      t.elbowL = -0.8;
+    } else {
+      t.armRx = -0.35;
+      t.armRz = 0.05;
+      t.elbowR = -0.45;
+    }
   }
 
   _apply() {
@@ -129,5 +190,9 @@ export class CharacterAnimator {
     j.armR.rotation.z = q.armRz;
     j.elbowL.rotation.x = q.elbowL;
     j.elbowR.rotation.x = q.elbowR;
+    if (j.hand) {
+      this.roll = (this.roll || 0) + ((this.weaponRoll || 0) - (this.roll || 0)) * 0.25;
+      j.hand.rotation.z = this.roll;
+    }
   }
 }

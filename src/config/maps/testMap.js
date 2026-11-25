@@ -126,10 +126,49 @@ export default {
     bushes: 240,
     grass: 5000,
     flowers: 700,
-    exclusions: [{ x: 0, z: 0, radius: 6 }],
+    // Keep the spawn, the shooting lane and the far targets free of vegetation.
+    exclusions: [
+      { x: 0, z: 0, radius: 6 },
+      { x: 0, z: -30, radius: 7 },
+      { x: 2, z: -48, radius: 8 },
+      { x: -11, z: -56, radius: 7 },
+      { x: -3, z: -76, radius: 7 },
+    ],
   },
 
   spawnPoints: [
     { x: 0, z: 4, yaw: 0 },
   ],
+
+  // Training content: weapon rack, consumables, targets at several ranges, a turret.
+  training: {
+    loot: [
+      { weapon: 'pistol', x: -11, z: -4 },
+      { weapon: 'revolver', x: -9, z: -4 },
+      { weapon: 'burstSmg', x: -7, z: -4 },
+      { weapon: 'compactSmg', x: -5, z: -4 },
+      { weapon: 'assaultRifle', x: -3, z: -4 },
+      { weapon: 'heavyRifle', x: -1, z: -4 },
+      { weapon: 'shotgun', x: 1, z: -4 },
+      { weapon: 'sniper', x: 3, z: -4 },
+      { weapon: 'carbine', x: 5, z: -4 },
+      { weapon: 'crossbow', x: 7, z: -4 },
+      { weapon: 'lmg', x: 9, z: -4 },
+      { weapon: 'rocketLauncher', x: 11, z: -4 },
+      { consumable: 'smallHeal', count: 2, x: -4.5, z: 0.5 },
+      { consumable: 'bigHeal', count: 1, x: -1.5, z: 0.5 },
+      { consumable: 'smallShield', count: 2, x: 1.5, z: 0.5 },
+      { consumable: 'bigShield', count: 1, x: 4.5, z: 0.5 },
+    ],
+    dummies: [
+      { x: -8, z: -19, yaw: 0 },
+      { x: -4, z: -20, yaw: 0, shield: 50 },
+      { x: 0, z: -19, yaw: 0, shield: 100 },
+      { x: 5, z: -20, yaw: 0 },
+      { x: 0, z: -40, yaw: 0, shield: 50 },
+      { x: -13, z: -58, yaw: 0 },
+      { x: -6, z: -78, yaw: 0, shield: 100 },
+      { x: -19, z: -15, yaw: 45, kind: 'turret' },
+    ],
+  },
 };

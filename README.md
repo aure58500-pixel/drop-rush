@@ -2,7 +2,7 @@
 
 Battle Royale 3D multijoueur à la troisième personne, jouable directement dans le navigateur (ordinateur, tablette, téléphone), hébergé sur GitHub Pages, sans serveur de jeu dédié.
 
-> **État actuel : étape 1 + construction en solo.** Moteur 3D, carte de test, déplacements, collisions, caméra, commandes clavier/souris et tactiles, système de construction (murs, rampes, plateformes). Les armes, le multijoueur Firebase, la zone et les grandes cartes arrivent dans les étapes suivantes.
+> **État actuel : étapes 1, 2 et construction, en solo.** Moteur 3D, carte d'entraînement, déplacements, collisions, caméra, construction, 12 armes, dégâts, santé et bouclier, inventaire, consommables, mannequins d'entraînement et HUD de combat. Le multijoueur Firebase, la zone et les grandes cartes arrivent dans les étapes suivantes.
 
 ## Sommaire
 
@@ -78,18 +78,65 @@ Les touches sont liées à la **position physique** des touches (`KeyboardEvent.
 | Sauter | Espace |
 | Courir | Maj gauche |
 | S'accroupir | Ctrl gauche ou C |
-| Viser (zoom, FOV 75° → 60°) | Clic droit |
+| Viser (zoom, FOV 75° → 60°, plus fort au fusil de précision) | Clic droit |
 | Pause | Échap ou P |
 | Aide des commandes | H |
+| Tirer | Clic gauche |
+| Recharger | R |
+| Ramasser | E |
+| Jeter l'arme active | G |
+| Changer d'arme | 1 à 5 ou molette |
+| Petit soin / grand soin / petit bouclier / grand bouclier | 6 / 7 / 8 / 9 |
 | Mode construction | B |
 | Choisir la pièce (mur, rampe, plateforme) | Molette ou 1 / 2 / 3 |
 | Pivoter la pièce | X |
 | Poser (maintenir pour enchaîner) | Clic gauche |
 | Annuler (quitter la construction) | Clic droit |
 
-Écran tactile : joystick virtuel à gauche (poussé à fond = course), glisser à droite pour la caméra, boutons Sauter, Accroupir, Viser, Construire et Pause (au moins 56 px). En construction, quatre boutons supplémentaires apparaissent : Poser, Pièce, Pivoter, Annuler.
+Écran tactile : joystick virtuel à gauche (poussé à fond = course), glisser à droite pour la caméra, boutons Tirer (maintenir, et glisser le doigt pour viser en tirant), Recharger, Viser, Sauter, Accroupir, Construire et Pause (au moins 56 px). Le bouton Ramasser apparaît près d'un objet. On change d'arme en touchant un emplacement et on utilise un soin en touchant son icône. En construction, quatre boutons apparaissent : Poser, Pièce, Pivoter, Annuler.
 
 > **Attention à Ctrl + Z (AZERTY)** : sur AZERTY, Ctrl gauche + Z correspond physiquement à Ctrl + W, raccourci de fermeture d'onglet que les navigateurs ne laissent pas intercepter. Le jeu demande une confirmation avant de quitter, propose la touche **C** pour s'accroupir, le mode « Accroupi en mode bascule », et capture le clavier en **plein écran** (Chrome/Edge, bouton dans les paramètres).
+
+## Armes et combat
+
+| Arme | Dégâts | Cadence (coups/min) | Chargeur | Rechargement | Portée | Dispersion |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pistolet léger | 18 | 240 | 12 | 1,4 s | 60 m | 1,2° |
+| Revolver | 45 | 90 | 6 | 2,2 s | 80 m | 0,8° |
+| SMG rafale (3 coups par clic) | 16 | 900 | 30 | 1,8 s | 45 m | 2,5° |
+| SMG compacte | 14 | 1 100 | 35 | 2 s | 35 m | 3° |
+| Fusil d'assaut | 30 | 600 | 30 | 2,4 s | 150 m | 1,8° |
+| Fusil d'assaut lourd | 38 | 480 | 25 | 2,6 s | 160 m | 1,6° |
+| Fusil à pompe | 8 × 12 | 70 | 6 | 3 s | 25 m | 6° |
+| Fusil de précision | 90 | 45 | 5 | 3 s | 400 m | 0,2° |
+| Carabine semi-automatique | 35 | 180 | 15 | 2,2 s | 200 m | 0,6° |
+| Arbalète (flèche à 60 m/s) | 80 | 40 | 1 | 2,5 s | 120 m | 0,3° |
+| Mitrailleuse légère | 22 | 750 | 75 | 4,5 s | 120 m | 3,5° |
+| Lance-roquettes (roquette à 40 m/s) | 100 + zone 60 sur 4 m | 30 | 1 | 3,5 s | toute la carte | 0° |
+
+Règles :
+
+- Tirs instantanés (lancer de rayon) pour toutes les armes, sauf l'arbalète et le lance-roquettes, qui tirent des projectiles physiques. Les flèches restent plantées 10 s. Les roquettes explosent à l'impact.
+- La visée part de la caméra (le centre du viseur), le tir part des yeux du personnage : un mur devant le personnage arrête bien la balle.
+- Tir à la tête ×2 (sauf lance-roquettes). Dégâts à 60 % au-delà de 75 % de la portée.
+- Dispersion : +0,15° par tir successif, remise à zéro après 0,4 s sans tirer. ×1,5 en course, ×2 en l'air, ×0,7 accroupi, ×0,5 en visée. Le viseur s'écarte selon la dispersion réelle.
+- Impossible de tirer en courant, sauf au pistolet et au revolver : maintenir le tir arrête la course.
+- Changer d'arme annule le rechargement. Un chargeur vide se recharge tout seul.
+- Le bouclier absorbe les dégâts avant la santé. Les explosions ne traversent pas les murs, et le tireur ne subit pas sa propre roquette.
+- Les balles et explosions abîment les constructions.
+
+Inventaire : 5 emplacements d'armes. Ramasser une arme déjà possédée remplit son chargeur. Inventaire plein : l'arme active est échangée et tombe au sol.
+
+| Consommable | Effet | Durée | Touche |
+| --- | --- | --- | --- |
+| Petit soin | +25 santé | 2 s | 6 |
+| Grand soin | santé à 100 | 5 s | 7 |
+| Petit bouclier | +25 bouclier | 2 s | 8 |
+| Grand bouclier | +50 bouclier | 4 s | 9 |
+
+5 unités au maximum par type. Se déplacer, sauter, tirer ou subir des dégâts annule l'utilisation.
+
+Carte d'entraînement : les 12 armes posées en ligne devant le point d'apparition, les 4 consommables juste derrière, des mannequins à 15, 35, 55 et 75 m (certains avec bouclier), et une tourelle rouge qui riposte (6 dégâts toutes les 1,6 s, à moins de 35 m) pour tester la santé, le bouclier et les soins. Les objets réapparaissent 6 s après avoir été ramassés, les mannequins 3 s après leur élimination. En entraînement, on réapparaît en gardant son inventaire.
 
 ## Construction
 
@@ -101,7 +148,7 @@ Grille de 2 m, étages de 2 m. Les pièces se posent là où vous visez, à moin
 
 L'aperçu est vert quand la pose est possible, rouge sinon, avec le motif affiché (emplacement occupé, joueur dans la zone, hors de la carte, obstacle, sous le sol, trop loin, limite atteinte). Les pièces posées sur le terrain sont ancrées à la hauteur du sol (un remplissage comble les pentes). Viser une construction place la pièce suivante contre elle : plateforme voisine, rampe sur une plateforme, mur empilé (moitié haute d'un mur) ou prolongé (moitié basse). Le tir est désactivé en mode construction. La limite est de 1 000 constructions. Les matériaux sont illimités.
 
-Les constructions sont destructibles par l'API `BuildingSystem.damageFromHit(hit, dégâts)` et `BuildingSystem.explode(x, y, z, rayon, dégâts)`, prévues pour les armes de l'étape 2. Paramètres : `src/config/buildConfig.js`.
+Les constructions sont détruites par les tirs et les explosions. Paramètres : `src/config/buildConfig.js`.
 
 ## Architecture
 
@@ -131,11 +178,14 @@ drop-rush/
     │   ├── physics/            CollisionWorld : boîtes, rampes, cylindres, terrain, raycast
     │   └── utils/              Maths, aléatoire déterministe (mulberry32), bruit
     ├── building/               Construction : état et validation (purs), ciblage, rendu instancié, débris
+    ├── combat/                 Santé, balistique, cibles, résolution des tirs et projectiles (purs), effets, mannequins
+    ├── weapons/                Minuterie des armes (cadence, rafales, rechargement), modèles 3D et icônes
+    ├── loot/                   Objets au sol (logique pure) et leur rendu
     ├── map/                    Génération et rendu des cartes
     ├── player/                 Moteur de déplacement, contrôleur, modèle, animation, caméra
     ├── ui/                     Menu principal, pause, paramètres, HUD
     ├── audio/                  Lecture Web Audio + sons synthétisés
-    ├── weapons/ combat/ loot/ zone/ match/ network/   (étapes suivantes)
+    ├── zone/ match/ network/   (étapes suivantes)
 ```
 
 Principes :
@@ -152,6 +202,10 @@ Principes :
 - Sensibilité souris (0,002 rad/px par défaut), touches, réglages tactiles : `src/config/controlsConfig.js`.
 - Qualité graphique et seuil d'adaptation (45 FPS) : `src/config/graphicsConfig.js`.
 - Construction (grille, résistances, portée, limite de 1 000, animation de 0,25 s) : `src/config/buildConfig.js`.
+- Armes (statistiques, modèle 3D décrit en pièces, paramètres du son) : `src/config/weapons.js`. Ajouter une entrée crée une nouvelle arme sans toucher au code.
+- Règles de combat (atténuation, dispersion, recul, ramassage) et entraînement (mannequins, tourelle) : `src/config/combatConfig.js`.
+- Consommables : `src/config/consumables.js`.
+- Contenu d'entraînement (armes au sol, mannequins) : section `training` de `src/config/maps/testMap.js`.
 - Nouvelle apparence : ajoutez une entrée dans `src/config/skins.js`.
 - Nouvelle carte : créez un fichier dans `src/config/maps/` (relief, rivières, bâtiments, zones, accessoires, végétation, points d'apparition) puis déclarez-le dans `src/config/maps/index.js`.
 

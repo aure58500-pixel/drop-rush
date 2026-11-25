@@ -64,6 +64,12 @@ export class CharacterModel {
       add(elbow, box(0.09, 0.09, 0.1), 'skin', 0, -0.28, 0.01);
       j[`arm${s}`] = shoulder;
       j[`elbow${s}`] = elbow;
+      if (side < 0) {
+        // Weapon socket in the right hand. Rotated so the weapon's +Z follows the forearm (-Y).
+        const hand = joint(elbow, 0, -0.29, 0.03);
+        hand.rotation.x = Math.PI / 2;
+        j.hand = hand;
+      }
 
       const leg = joint(j.hips, side * 0.11, -0.02, 0);
       add(leg, box(0.15, 0.42, 0.16), 'secondary', 0, -0.21, 0);
@@ -90,6 +96,14 @@ export class CharacterModel {
 
   setVisible(visible) {
     this.root.visible = visible;
+  }
+
+  // Shows `mesh` (or nothing) in the right hand.
+  setWeaponMesh(mesh) {
+    if (this.weaponMesh === mesh) return;
+    if (this.weaponMesh) this.joints.hand.remove(this.weaponMesh);
+    this.weaponMesh = mesh;
+    if (mesh) this.joints.hand.add(mesh);
   }
 
   dispose() {

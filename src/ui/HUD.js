@@ -67,14 +67,22 @@ export class HUD {
     this.elimination.classList.add('hidden');
   }
 
-  update(dt, { player, aiming, boundaryDistance, warningDistance, perf }) {
-    // Crosshair gap reacts to movement, jumps and aiming.
+  update(dt, { player, aiming, boundaryDistance, warningDistance, perf, spreadPx = null, crosshair = 'default' }) {
+    // Crosshair gap = real weapon spread in pixels (or a movement-based gap with empty hands).
     const speed = player.controller.state.horizontalSpeed;
-    let target = 6 + speed * 1.6;
-    if (!player.motor.grounded) target += 10;
-    if (player.motor.crouched) target *= 0.7;
-    if (aiming) target *= 0.5;
-    this.spread += (target - this.spread) * Math.min(1, dt * 14);
+    let target = spreadPx;
+    if (target === null) {
+      target = 6 + speed * 1.6;
+      if (!player.motor.grounded) target += 10;
+      if (player.motor.crouched) target *= 0.7;
+      if (aiming) target *= 0.5;
+    }
+    target = Math.max(4, Math.min(160, target));
+    this.spread += (target - this.spread) * Math.min(1, dt * 18);
+    if (this.crosshairKind !== crosshair) {
+      this.crosshairKind = crosshair;
+      this.crosshair.dataset.kind = crosshair;
+    }
     this.crosshair.style.setProperty('--gap', `${this.spread.toFixed(1)}px`);
     this.crosshair.classList.toggle('aiming', aiming);
 

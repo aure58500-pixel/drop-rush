@@ -16,6 +16,14 @@ export class ThirdPersonCamera {
     this.distanceToPivot = config.distance;
     this.forward = { x: 0, y: 0, z: -1 };
     this.position = { x: 0, y: 0, z: 0 }; // plain numbers, usable by gameplay code
+    this.recoilPitch = 0;
+    this.recoilYaw = 0;
+  }
+
+  // Camera kick of a shot, in degrees. It recovers over time (see update).
+  addRecoil(degrees) {
+    this.recoilPitch += (degrees * Math.PI) / 180;
+    this.recoilYaw += ((Math.random() - 0.5) * degrees * 0.35 * Math.PI) / 180;
   }
 
   applyLook(dx, dy, sensitivity, invertY = false) {
@@ -27,6 +35,8 @@ export class ThirdPersonCamera {
   }
 
   snap() {
+    this.recoilPitch = 0;
+    this.recoilYaw = 0;
     this.pivotY = null;
     this.currentDistance = this.cfg.distance;
   }
@@ -37,8 +47,13 @@ export class ThirdPersonCamera {
    * @param {number} eyeHeight
    * @param {boolean} aiming
    */
-  update(dt, feet, eyeHeight, aiming) {
+  update(dt, feet, eyeHeight, aiming, aimFov = this.cfg.aimFov, recoilRecovery = 7) {
     const cfg = this.cfg;
+    const recover = Math.exp(-recoilRecovery * dt);
+    this.recoilPitch *= recover;
+    this.recoilYaw *= recover;
+    const viewPitch = clamp(this.pitch + this.recoilPitch, cfg.minPitchRad, cfg.maxPitchRad);
+    const viewYaw = this.yaw + this.recoilYaw;
     this.aimT = damp(this.aimT, aiming ? 1 : 0, cfg.aimTransitionSpeed, dt);
 
     const targetPivotY = feet.y + eyeHeight;
@@ -47,15 +62,15 @@ export class ThirdPersonCamera {
     const py = this.pivotY;
     const pz = feet.z;
 
-    const cp = Math.cos(this.pitch);
-    const fx = -Math.sin(this.yaw) * cp;
-    const fy = Math.sin(this.pitch);
-    const fz = -Math.cos(this.yaw) * cp;
+    const cp = Math.cos(viewPitch);
+    const fx = -Math.sin(viewYaw) * cp;
+    const fy = Math.sin(viewPitch);
+    const fz = -Math.cos(viewYaw) * cp;
     this.forward.x = fx;
     this.forward.y = fy;
     this.forward.z = fz;
-    const rx = Math.cos(this.yaw);
-    const rz = -Math.sin(this.yaw);
+    const rx = Math.cos(viewYaw);
+    const rz = -Math.sin(viewYaw);
 
     // 1) Shoulder offset, shortened if a wall is beside the player.
     let shoulder = lerp(cfg.shoulderOffset, cfg.aimShoulderOffset, this.aimT);
@@ -84,7 +99,7 @@ export class ThirdPersonCamera {
     this.position.z = cz;
     cam.position.set(cx, cy, cz);
     cam.lookAt(cx + fx, cy + fy, cz + fz);
-    const fov = lerp(cfg.fov, cfg.aimFov, this.aimT);
+    const fov = lerp(cfg.fov, aimFov, this.aimT);
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = fov;
       cam.updateProjectionMatrix();
