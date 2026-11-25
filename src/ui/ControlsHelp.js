@@ -11,6 +11,7 @@ export function createControlsList(isTouch) {
       ['Sauter', 'Sauter'],
       ['Accroupir', 'S’accroupir / se relever'],
       ['Viser', 'Viser (zoom)'],
+      ['Construire', 'Mode construction : Poser, Pièce, Pivoter, Annuler'],
       ['❚❚', 'Pause'],
     ]
     : [
@@ -19,7 +20,11 @@ export function createControlsList(isTouch) {
       [actionLabel('jump'), 'Sauter'],
       [actionLabel('sprint'), 'Courir'],
       [`${actionLabel('crouch')} / ${keyLabel('KeyC')}`, 'S’accroupir'],
-      ['Clic droit', 'Viser'],
+      ['Clic droit', 'Viser (annule en construction)'],
+      [actionLabel('build'), 'Mode construction'],
+      [`Molette / ${actionLabel('slot1')} ${actionLabel('slot2')} ${actionLabel('slot3')}`, 'Choisir mur, rampe, plateforme'],
+      [actionLabel('rotateBuild'), 'Pivoter la pièce (construction)'],
+      ['Clic gauche', 'Poser la pièce (construction)'],
       [`${actionLabel('pause')}`, 'Pause'],
       [actionLabel('toggleHelp'), 'Afficher / masquer l’aide'],
     ];

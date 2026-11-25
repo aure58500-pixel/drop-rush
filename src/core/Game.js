@@ -4,6 +4,7 @@ import { GAME_CONFIG } from '../config/gameConfig.js';
 import { loadMapDefinition } from '../config/maps/index.js';
 import { QUALITY_PRESETS } from '../config/graphicsConfig.js';
 import { TOUCH_SETTINGS } from '../config/controlsConfig.js';
+import { PLAYER_CONFIG } from '../config/playerConfig.js';
 import { Engine } from './Engine.js';
 import { GameLoop } from './GameLoop.js';
 import { EventBus } from './EventBus.js';
@@ -21,6 +22,9 @@ import { AudioManager } from '../audio/AudioManager.js';
 import { MainMenu } from '../ui/MainMenu.js';
 import { PauseMenu } from '../ui/PauseMenu.js';
 import { HUD } from '../ui/HUD.js';
+import { BuildBar } from '../ui/BuildBar.js';
+import { BuildingSystem } from '../building/BuildingSystem.js';
+import { BUILD_CONFIG } from '../config/buildConfig.js';
 import { computeMenuFraming } from '../ui/menuFraming.js';
 
 export const GameState = Object.freeze({ MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused' });
@@ -61,6 +65,14 @@ export class Game {
       events: this.events,
     });
     this.cameraRig = new ThirdPersonCamera(this.engine.camera, this.world);
+    this.building = new BuildingSystem({
+      scene: this.engine.scene,
+      world: this.world,
+      terrain: this.map.layout.terrain,
+      mapSize: this.map.layout.size,
+      audio: this.audio,
+      events: this.events,
+    });
     this.spawnPlayer();
 
     this.quality = new QualityManager({
@@ -125,6 +137,11 @@ export class Game {
       onQuit: () => this.quitToMenu(),
       onFullscreen: fullscreen,
     });
+    this.buildBar = new BuildBar(this.uiRoot, {
+      isTouch: this.isTouch,
+      pieces: BUILD_CONFIG.pieceOrder.map((id) => ({ id, name: BUILD_CONFIG.pieces[id].name })),
+      onSelect: (index) => this.building.selectPiece(index),
+    });
     if (this.isTouch) {
       this.touch = new TouchControls(this.uiRoot, this.input, { onPause: () => this.pause() });
     }
@@ -135,7 +152,12 @@ export class Game {
       if (key === 'volume') this.audio.setVolume(value);
       if (key === 'quality') this.quality.refresh();
     });
+    this.events.on('build:mode', ({ active }) => {
+      this.buildBar.setVisible(active && this.state === GameState.PLAYING);
+      this.touch?.setBuildMode(active);
+    });
     this.events.on('player:eliminated', ({ reason }) => {
+      this.building.setActive(false);
       this.respawnTimer = GAME_CONFIG.trainingRespawnDelay;
       const text = reason === 'outOfBounds' ? 'Vous êtes sorti de la carte.' : 'Vous avez été éliminé.';
       this.hud.showElimination(text, this.respawnTimer);
@@ -183,6 +205,8 @@ export class Game {
     this.state = GameState.PLAYING;
     this.input.gameActive = true;
     this.input.reset();
+    this.building.setActive(false);
+    this.building.clear();
     this.spawnPlayer();
     this.hud.hideElimination();
     if (!this.isTouch) {
@@ -193,6 +217,7 @@ export class Game {
   pause() {
     if (this.state !== GameState.PLAYING) return;
     this.state = GameState.PAUSED;
+    this.building.setActive(false);
     this.input.reset();
     this.touch?.setVisible(false);
     this.pauseMenu.show();
@@ -218,6 +243,8 @@ export class Game {
     this.input.exitPointerLock();
     this.input.gameActive = false;
     this.state = GameState.MENU;
+    this.building.setActive(false);
+    this.building.clear();
     this.spawnPlayer();
     this.mainMenu.show();
   }
@@ -236,8 +263,42 @@ export class Game {
       sprint: this.input.isDown('sprint') || move.analogSprint,
       crouch,
       jumpPressed: this.input.wasPressed('jump'),
-      aiming: this.isTouch ? this.touch.aim : this.input.isDown('aim'),
+      aiming: !this.building.active && !this.suppressAim && (this.isTouch ? this.touch.aim : this.input.isDown('aim')),
     };
+  }
+
+  // Build mode input: B toggles, wheel / 1-3 pick the piece, X rotates,
+  // left click places (hold to repeat), right click cancels.
+  handleBuildInput(dt, wheel) {
+    const input = this.input;
+    const building = this.building;
+    this.wheelCooldown = Math.max(0, (this.wheelCooldown || 0) - dt);
+    if (this.suppressAim && !input.isDown('aim')) this.suppressAim = false;
+
+    if (!this.player.alive) {
+      building.setActive(false);
+      return;
+    }
+    if (input.wasPressed('build')) building.toggle();
+    if (!building.active) return;
+
+    if (wheel !== 0 && this.wheelCooldown <= 0) {
+      building.cyclePiece(wheel > 0 ? 1 : -1);
+      this.wheelCooldown = BUILD_CONFIG.wheelCooldown;
+    }
+    BUILD_CONFIG.pieceOrder.forEach((_, i) => {
+      if (input.wasPressed(`slot${i + 1}`)) building.selectPiece(i);
+    });
+    if (input.wasPressed('cyclePiece')) building.cyclePiece(1);
+    if (input.wasPressed('rotateBuild')) building.rotate();
+
+    if (input.wasPressed('aim') || input.wasPressed('cancelBuild')) {
+      building.setActive(false);
+      this.suppressAim = input.isDown('aim'); // no zoom while the cancel click is still held
+      return;
+    }
+    // Shooting stays disabled for the whole build mode (weapons arrive in stage 2).
+    if (input.wasPressed('fire') || input.isDown('fire')) building.tryPlace();
   }
 
   update(dt) {
@@ -252,6 +313,7 @@ export class Game {
       this.cameraRig.applyLook(look.x, look.y, this.settings.get('mouseSensitivity'), this.settings.get('invertY'));
       this.cameraRig.applyLook(look.touchX, look.touchY, TOUCH_SETTINGS.lookSensitivity, this.settings.get('invertY'));
 
+      this.handleBuildInput(dt, input.consumeWheel());
       const intent = this.buildIntent();
       if (this.player.alive) {
         this.player.update(dt, intent, this.cameraRig);
@@ -267,6 +329,15 @@ export class Game {
       this.cameraRig.update(dt, p, this.player.eyeHeight, intent.aiming && this.player.alive);
       this.player.model.setVisible(this.player.alive && this.cameraRig.distanceToPivot > 0.7);
 
+      this.building.update(dt, {
+        cam: this.cameraRig.position,
+        forward: this.cameraRig.forward,
+        yaw: this.cameraRig.yaw,
+        player: { x: p.x, y: p.y, z: p.z, radius: PLAYER_CONFIG.capsule.radius, height: this.player.motor.height },
+        eyeHeight: this.player.eyeHeight,
+      });
+      if (this.building.active) this.buildBar.update(this.building.getUiState());
+
       const showPerf = this.settings.get('showFps');
       this.hud.update(dt, {
         player: this.player,
@@ -281,8 +352,11 @@ export class Game {
         } : null,
       });
     } else if (this.state === GameState.MENU) {
+      this.building.update(dt, null);
       this.updateMenuCamera(dt);
     } else if (this.state === GameState.PAUSED) {
+      this.building.update(dt, null);
+      input.consumeWheel();
       input.consumeLook();
       if (input.wasPressed('pause') && !this.isTouch) this.resume();
     }

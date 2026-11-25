@@ -21,11 +21,20 @@ export class TouchControls {
       <div class="touch-buttons">
         <button class="touch-btn touch-aim" data-action="aim">Viser</button>
         <button class="touch-btn touch-crouch" data-action="crouch">Accroupir</button>
-        <button class="touch-btn touch-jump" data-action="jump">Sauter</button>
+        <button class="touch-btn touch-build" data-action="build" data-mode="tap">Construire</button>
+        <button class="touch-btn touch-jump" data-action="jump" data-mode="hold">Sauter</button>
+      </div>
+      <div class="touch-build-panel hidden">
+        <button class="touch-btn touch-place" data-action="fire" data-mode="hold">Poser</button>
+        <button class="touch-btn" data-action="cyclePiece" data-mode="tap">Pièce</button>
+        <button class="touch-btn" data-action="rotateBuild" data-mode="tap">Pivoter</button>
+        <button class="touch-btn" data-action="cancelBuild" data-mode="tap">Annuler</button>
       </div>`;
     root.appendChild(this.el);
     this.joystick = this.el.querySelector('.joystick');
     this.knob = this.el.querySelector('.joystick-knob');
+    this.buildPanel = this.el.querySelector('.touch-build-panel');
+    this.buildButton = this.el.querySelector('.touch-build');
     this.el.style.setProperty('--touch-btn-min', `${this.cfg.minButtonSize}px`);
 
     const moveZone = this.el.querySelector('.touch-zone-move');
@@ -49,13 +58,15 @@ export class TouchControls {
         } else if (action === 'aim') {
           this.aimToggled = !this.aimToggled;
           btn.classList.toggle('toggled', this.aimToggled);
+        } else if (btn.dataset.mode === 'tap') {
+          this.input.tapVirtual(action);
         } else {
           this.input.pressVirtual(action);
         }
       });
       const release = () => {
         btn.classList.remove('active');
-        if (action === 'jump') this.input.releaseVirtual(action);
+        if (btn.dataset.mode === 'hold') this.input.releaseVirtual(action);
       };
       btn.addEventListener('pointerup', release);
       btn.addEventListener('pointercancel', release);
@@ -66,6 +77,12 @@ export class TouchControls {
   setVisible(visible) {
     this.el.classList.toggle('hidden', !visible);
     if (!visible) this.resetState();
+  }
+
+  // Shows the build buttons while the build mode is active.
+  setBuildMode(active) {
+    this.buildPanel.classList.toggle('hidden', !active);
+    this.buildButton.classList.toggle('toggled', active);
   }
 
   resetState() {
