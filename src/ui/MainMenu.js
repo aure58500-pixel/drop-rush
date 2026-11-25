@@ -26,7 +26,7 @@ export class MainMenu {
             <span>Apparence</span>
             <div class="skin-grid">
               ${SKINS.map((s) => `
-                <button class="skin-chip" data-skin="${s.id}" style="--c1:${s.colors.primary};--c2:${s.colors.secondary};--c3:${s.colors.accent}">
+                <button class="skin-chip" data-skin="${s.id}" title="${escapeHtml(s.name)}" aria-label="${escapeHtml(s.name)}" style="--c1:${s.colors.primary};--c2:${s.colors.secondary};--c3:${s.colors.accent}">
                   <i></i><span>${escapeHtml(s.name)}</span>
                 </button>`).join('')}
             </div>
