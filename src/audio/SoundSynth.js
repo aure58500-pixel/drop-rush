@@ -42,6 +42,17 @@ export const SOUND_DEFINITIONS = {
     const thump = Math.sin(t * 2 * Math.PI * (90 - t * 120)) * Math.exp(-t * 16);
     return thump + lowpass(s, n, 0.12) * Math.exp(-t * 25) * 0.6;
   }, 17),
+  buildPlace: (ctx) => render(ctx, 0.24, (t, n, s) => {
+    const thump = Math.sin(t * 2 * Math.PI * (150 - t * 220)) * Math.exp(-t * 18);
+    const knock = Math.sin(t * 2 * Math.PI * 430) * Math.exp(-t * 55) * 0.5;
+    return thump + knock + lowpass(s, n, 0.25) * Math.exp(-t * 40) * 0.45;
+  }, 21),
+  buildFail: (ctx) => render(ctx, 0.14, (t) => (Math.sin(t * 2 * Math.PI * 170) + Math.sin(t * 2 * Math.PI * 185) * 0.7) * Math.exp(-t * 26), 22),
+  buildBreak: (ctx) => render(ctx, 0.5, (t, n, s) => {
+    const crack = n * Math.exp(-t * 70);
+    const rumble = lowpass(s, n, 0.28) * Math.exp(-t * 8) * (0.7 + 0.3 * Math.sin(t * 90));
+    return crack * 0.7 + rumble;
+  }, 23),
   click: (ctx) => render(ctx, 0.06, (t) => Math.sin(t * 2 * Math.PI * 1200) * Math.exp(-t * 80), 18),
   hover: (ctx) => render(ctx, 0.05, (t) => Math.sin(t * 2 * Math.PI * 900) * Math.exp(-t * 90) * 0.5, 19),
 };

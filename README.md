@@ -2,7 +2,7 @@
 
 Battle Royale 3D multijoueur à la troisième personne, jouable directement dans le navigateur (ordinateur, tablette, téléphone), hébergé sur GitHub Pages, sans serveur de jeu dédié.
 
-> **État actuel : étape 1 sur 7.** Moteur 3D, carte de test, déplacements, collisions, caméra, commandes clavier/souris et tactiles. Les armes, le multijoueur Firebase, la zone, les grandes cartes et la construction arrivent dans les étapes suivantes.
+> **État actuel : étape 1 + construction en solo.** Moteur 3D, carte de test, déplacements, collisions, caméra, commandes clavier/souris et tactiles, système de construction (murs, rampes, plateformes). Les armes, le multijoueur Firebase, la zone et les grandes cartes arrivent dans les étapes suivantes.
 
 ## Sommaire
 
@@ -81,10 +81,27 @@ Les touches sont liées à la **position physique** des touches (`KeyboardEvent.
 | Viser (zoom, FOV 75° → 60°) | Clic droit |
 | Pause | Échap ou P |
 | Aide des commandes | H |
+| Mode construction | B |
+| Choisir la pièce (mur, rampe, plateforme) | Molette ou 1 / 2 / 3 |
+| Pivoter la pièce | X |
+| Poser (maintenir pour enchaîner) | Clic gauche |
+| Annuler (quitter la construction) | Clic droit |
 
-Écran tactile : joystick virtuel à gauche (poussé à fond = course), glisser à droite pour la caméra, boutons Sauter, Accroupir, Viser et Pause (au moins 56 px).
+Écran tactile : joystick virtuel à gauche (poussé à fond = course), glisser à droite pour la caméra, boutons Sauter, Accroupir, Viser, Construire et Pause (au moins 56 px). En construction, quatre boutons supplémentaires apparaissent : Poser, Pièce, Pivoter, Annuler.
 
 > **Attention à Ctrl + Z (AZERTY)** : sur AZERTY, Ctrl gauche + Z correspond physiquement à Ctrl + W, raccourci de fermeture d'onglet que les navigateurs ne laissent pas intercepter. Le jeu demande une confirmation avant de quitter, propose la touche **C** pour s'accroupir, le mode « Accroupi en mode bascule », et capture le clavier en **plein écran** (Chrome/Edge, bouton dans les paramètres).
+
+## Construction
+
+Grille de 2 m, étages de 2 m. Les pièces se posent là où vous visez, à moins de 14 m de vous :
+
+- **Mur** 2 × 2 m, 0,25 m d'épaisseur, 200 points de résistance.
+- **Rampe** 2 × 2 m à 45°, 150 points de résistance.
+- **Plateforme** 2 × 2 m, 0,25 m d'épaisseur, 100 points de résistance.
+
+L'aperçu est vert quand la pose est possible, rouge sinon, avec le motif affiché (emplacement occupé, joueur dans la zone, hors de la carte, obstacle, sous le sol, trop loin, limite atteinte). Les pièces posées sur le terrain sont ancrées à la hauteur du sol (un remplissage comble les pentes). Viser une construction place la pièce suivante contre elle : plateforme voisine, rampe sur une plateforme, mur empilé (moitié haute d'un mur) ou prolongé (moitié basse). Le tir est désactivé en mode construction. La limite est de 1 000 constructions. Les matériaux sont illimités.
+
+Les constructions sont destructibles par l'API `BuildingSystem.damageFromHit(hit, dégâts)` et `BuildingSystem.explode(x, y, z, rayon, dégâts)`, prévues pour les armes de l'étape 2. Paramètres : `src/config/buildConfig.js`.
 
 ## Architecture
 
@@ -113,11 +130,12 @@ drop-rush/
     │   ├── input/              Clavier/souris (Pointer Lock), tactile, libellés de touches
     │   ├── physics/            CollisionWorld : boîtes, rampes, cylindres, terrain, raycast
     │   └── utils/              Maths, aléatoire déterministe (mulberry32), bruit
+    ├── building/               Construction : état et validation (purs), ciblage, rendu instancié, débris
     ├── map/                    Génération et rendu des cartes
     ├── player/                 Moteur de déplacement, contrôleur, modèle, animation, caméra
     ├── ui/                     Menu principal, pause, paramètres, HUD
     ├── audio/                  Lecture Web Audio + sons synthétisés
-    ├── weapons/ combat/ building/ loot/ zone/ match/ network/   (étapes 2 à 6)
+    ├── weapons/ combat/ loot/ zone/ match/ network/   (étapes suivantes)
 ```
 
 Principes :
@@ -133,6 +151,7 @@ Principes :
 - FOV (75° / 60°), distance et collisions de caméra : `src/config/cameraConfig.js`.
 - Sensibilité souris (0,002 rad/px par défaut), touches, réglages tactiles : `src/config/controlsConfig.js`.
 - Qualité graphique et seuil d'adaptation (45 FPS) : `src/config/graphicsConfig.js`.
+- Construction (grille, résistances, portée, limite de 1 000, animation de 0,25 s) : `src/config/buildConfig.js`.
 - Nouvelle apparence : ajoutez une entrée dans `src/config/skins.js`.
 - Nouvelle carte : créez un fichier dans `src/config/maps/` (relief, rivières, bâtiments, zones, accessoires, végétation, points d'apparition) puis déclarez-le dans `src/config/maps/index.js`.
 

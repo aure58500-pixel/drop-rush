@@ -81,13 +81,14 @@
           ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
           "$buildId": {
             ".write": "auth != null && root.child('rooms').child($code).child('players').child(auth.uid).exists()",
-            ".validate": "newData.hasChildren(['type', 'owner', 'health', 'gx', 'gy', 'gz', 'rot']) && (data.exists() ? newData.child('owner').val() === data.child('owner').val() : newData.child('owner').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['type', 'owner', 'health', 'gx', 'gy', 'gz', 'rot', 'by']) && (data.exists() ? newData.child('owner').val() === data.child('owner').val() : newData.child('owner').val() === auth.uid)",
             "type": { ".validate": "newData.isString() && (newData.val() === 'wall' || newData.val() === 'ramp' || newData.val() === 'floor')" },
             "owner": { ".validate": "newData.isString()" },
             "health": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200" },
             "gx": { ".validate": "newData.isNumber()" },
             "gy": { ".validate": "newData.isNumber()" },
             "gz": { ".validate": "newData.isNumber()" },
+            "by": { ".validate": "newData.isNumber()" },
             "rot": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
             "$other": { ".validate": false }
           }

@@ -15,6 +15,7 @@ export class ThirdPersonCamera {
     this.pivotY = null;
     this.distanceToPivot = config.distance;
     this.forward = { x: 0, y: 0, z: -1 };
+    this.position = { x: 0, y: 0, z: 0 }; // plain numbers, usable by gameplay code
   }
 
   applyLook(dx, dy, sensitivity, invertY = false) {
@@ -78,6 +79,9 @@ export class ThirdPersonCamera {
     if (cy < ground) cy = ground;
 
     const cam = this.camera;
+    this.position.x = cx;
+    this.position.y = cy;
+    this.position.z = cz;
     cam.position.set(cx, cy, cz);
     cam.lookAt(cx + fx, cy + fy, cz + fz);
     const fov = lerp(cfg.fov, cfg.aimFov, this.aimT);
