@@ -11,6 +11,10 @@ function setProgress(value, text) {
 }
 
 async function boot() {
+  if (new URLSearchParams(window.location.search).has('debug')) {
+    const { mountDebugOverlay } = await import('./ui/DebugOverlay.js');
+    mountDebugOverlay();
+  }
   if (!isWebGL2Available()) {
     showWebGLUnsupported();
     return;
