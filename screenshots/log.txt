@@ -1,0 +1,2 @@
+skins in menu: ninja_bleu, samourai_rouge, streetwear_jaune, gamer_violet, pirate_noir
+render: {"webgl2":true,"renderer":"WebKit WebGL","drawCalls":157,"triangles":114340,"characterTriangles":1590}
