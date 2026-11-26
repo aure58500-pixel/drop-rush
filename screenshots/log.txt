@@ -1,0 +1,23 @@
+first load (page + default map, software WebGL): 1318 ms
+maps in menu: ile, canaux, cite-ruines
+ile vue-ensemble: 117403 triangles, 917 draw calls
+ile couronne-pont-sud: 70639 triangles, 463 draw calls
+ile tour-grue: 29769 triangles, 78 draw calls
+ile burger-heliport: 33767 triangles, 57 draw calls
+ile hangar-conteneurs: 26961 triangles, 63 draw calls
+ile cascades: 93647 triangles, 607 draw calls
+ile: map switch 944 ms (generation + meshes 239 ms), 90415 triangles in total, 150 loot points, 21 spawn points
+canaux vue-ensemble: 104128 triangles, 819 draw calls
+canaux fontaine-pont: 64260 triangles, 331 draw calls
+canaux trampoline-canal: 48374 triangles, 213 draw calls
+canaux chateau-eau-horloge: 32864 triangles, 65 draw calls
+canaux immeubles-heliport: 27558 triangles, 41 draw calls
+canaux: map switch 2141 ms (generation + meshes 143 ms), 76702 triangles in total, 150 loot points, 20 spawn points
+cite-ruines vue-ensemble: 97590 triangles, 933 draw calls
+cite-ruines porte-sud: 77076 triangles, 664 draw calls
+cite-ruines ruines: 29846 triangles, 115 draw calls
+cite-ruines heliport-est: 34760 triangles, 128 draw calls
+cite-ruines burger-tour: 34230 triangles, 146 draw calls
+cite-ruines garage-conteneurs: 31552 triangles, 117 draw calls
+cite-ruines: map switch 1852 ms (generation + meshes 86 ms), 71470 triangles in total, 150 loot points, 20 spawn points
+renderer: {"webgl2":true,"renderer":"WebKit WebGL"}
