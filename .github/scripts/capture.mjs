@@ -27,7 +27,7 @@ await wait(1000);
 // Camera views per map: [name, camera polar (deg, r, y), target polar (deg, r, y)].
 const VIEWS = {
   ile: [
-    ['vue-ensemble', [180, 560, 430], [0, 0, 0], 50],
+    ['vue-ensemble', [180, 430, 330], [0, 0, 0], 55],
     ['couronne-pont-sud', [180, 152, 4], [0, 0, 3], 65],
     ['tour-grue', [40, 186, 7], [44, 245, 12], 65],
     ['burger-heliport', [108, 186, 6], [108, 232, 5], 65],
@@ -35,14 +35,14 @@ const VIEWS = {
     ['cascades', [180, 395, 14], [180, 345, -4], 60],
   ],
   canaux: [
-    ['vue-ensemble', [180, 480, 380], [0, 0, 0], 50],
+    ['vue-ensemble', [180, 370, 290], [0, 0, 0], 55],
     ['fontaine-pont', [180, 96, 5], [0, 0, 2], 65],
     ['trampoline-canal', [0, 92, 6], [22, 88, 0], 65],
     ['chateau-eau-horloge', [0, 168, 6], [0, 222, 12], 65],
     ['immeubles-heliport', [45, 175, 8], [45, 228, 9], 65],
   ],
   'cite-ruines': [
-    ['vue-ensemble', [180, 560, 430], [0, 0, 0], 50],
+    ['vue-ensemble', [180, 430, 330], [0, 0, 0], 55],
     ['porte-sud', [180, 362, 7], [180, 315, 3], 65],
     ['ruines', [262, 118, 7], [270, 160, 3], 65],
     ['heliport-est', [102, 112, 8], [102, 152, 5], 65],
@@ -80,6 +80,13 @@ for (const id of maps) {
       c.clearViewOffset();
       c.position.set(cx, cy, cz);
       c.lookAt(tx, ty, tz);
+      // Overviews are far away: open the view range and hide the zone wall for the picture.
+      const overview = cy > 100;
+      g.zoneMesh.mesh.visible = !overview;
+      c.far = overview ? 3000 : 470;
+      g.scene = g.engine.scene;
+      g.engine.scene.fog.far = overview ? 3000 : 480;
+      g.map.sky.setRadius(overview ? 1500 : 460);
       c.updateProjectionMatrix();
       g.engine.render();
       return { calls: g.engine.drawCalls, triangles: g.engine.triangles };

@@ -2,7 +2,7 @@
 
 Battle Royale 3D multijoueur à la troisième personne, jouable directement dans le navigateur (ordinateur, tablette, téléphone), hébergé sur GitHub Pages, sans serveur de jeu dédié.
 
-> **État actuel : étapes 1, 2 et construction, en solo.** Moteur 3D, carte d'entraînement, déplacements, collisions, caméra, construction, 12 armes, dégâts, santé et bouclier, inventaire, consommables, mannequins d'entraînement et HUD de combat. Le multijoueur Firebase, la zone et les grandes cartes arrivent dans les étapes suivantes.
+> **État actuel : en solo (entraînement).** Moteur 3D, trois cartes (L'Île, Ville des Canaux, Cité des Ruines), 5 personnages, déplacements, construction, 12 armes, santé et bouclier, inventaire, consommables, 150 points de butin par carte, zone de sécurité, mannequins d'entraînement et HUD de combat. Le multijoueur Firebase (salons) arrive à l'étape suivante.
 
 ## Sommaire
 
@@ -138,6 +138,20 @@ Inventaire : 5 emplacements d'armes. Ramasser une arme déjà possédée remplit
 
 Carte d'entraînement : les 12 armes posées en ligne devant le point d'apparition, les 4 consommables juste derrière, des mannequins à 15, 35, 55 et 75 m (certains avec bouclier), et une tourelle rouge qui riposte (6 dégâts toutes les 1,6 s, à moins de 35 m) pour tester la santé, le bouclier et les soins. Les objets réapparaissent 6 s après avoir été ramassés, les mannequins 3 s après leur élimination. En entraînement, on réapparaît en gardant son inventaire.
 
+## Cartes
+
+| Carte | Identifiant | Diamètre | Particularités |
+| --- | --- | --- | --- |
+| L'Île | `ile` | 700 m | Plateau entouré de falaises et de la mer (mortelle). Le centre (rond-point et couronne) est entouré d'une crevasse franchie par 4 ponts violets. Tour de contrôle et grue au nord-est, burger et héliport à l'est, hangar rouge et conteneurs au nord-ouest, deux cascades au sud. |
+| Ville des Canaux | `canaux` | 600 m | Plateau flottant (tomber élimine). Fontaine couronne au centre, canal en anneau franchi par 4 ponts, 4 canaux en diagonale. L'eau ralentit de 50 % sans tuer, même en sautant. 4 trampolines propulsent à environ 4 m vers l'avant. Château d'eau et horloge au nord, héliport au nord-est. |
+| Cité des Ruines | `cite-ruines` | 700 m | Mur d'enceinte de 6 m (limite infranchissable), porte sud grillagée ouverte, route en anneau autour d'une fontaine couronne, burger et tour au nord-ouest, garage à conteneurs et grue au nord, bâtiment moderne avec héliport et escalier extérieur à l'est, ruines à l'ouest. |
+
+Le choix de la carte se fait dans le menu principal (vignette `public/maps/carte-<id>.png` si l'image est présente, sinon le nom). La carte par défaut est `ile` ; un identifiant inconnu (par exemple une ancienne carte enregistrée) revient à `ile`. Chaque carte a au moins 20 points d'apparition espacés d'au moins 80 m et 150 points de butin générés par la graine (40 % d'armes, 40 % de soins, 20 % de boucliers).
+
+Tous les bâtiments ont un escalier intérieur jusqu'au toit. Seul l'auvent de la cabine des tours de contrôle est un toit de décor (non accessible). Les décors sans collision sont : tubes roses, véhicules, bannières, parasols, lampadaires, cascades, ballon et grue de la Ville des Canaux (hors de la zone jouable), flèche des grues.
+
+Zone de sécurité : centre tiré de la graine, à au moins 25 % de la taille de la carte du bord ; 6 phases de réduction linéaire (2:00, 4:00, 6:30, 8:30, 10:30, 12:30) ; dégâts 1 à 20 par seconde hors zone. En entraînement, la zone démarre au lancement et recommence après une réapparition. Pour la tester vite : ajoutez `?zoneSpeed=10` à l'adresse (10 fois plus rapide).
+
 ## Construction
 
 Grille de 2 m, étages de 2 m. Les pièces se posent là où vous visez, à moins de 14 m de vous :
@@ -182,11 +196,12 @@ drop-rush/
     ├── combat/                 Santé, balistique, cibles, résolution des tirs et projectiles (purs), effets, mannequins
     ├── weapons/                Minuterie des armes (cadence, rafales, rechargement), modèles 3D et icônes
     ├── loot/                   Objets au sol (logique pure) et leur rendu
-    ├── map/                    Génération et rendu des cartes
+    ├── map/                    Terrain circulaire, générateurs de bâtiments, décors instanciés, rendu des cartes
+    ├── zone/                   Zone de sécurité (logique pure) et son mur
     ├── player/                 Moteur de déplacement, contrôleur, modèle, animation, caméra
     ├── ui/                     Menu principal, pause, paramètres, HUD
     ├── audio/                  Lecture Web Audio + sons synthétisés
-    ├── zone/ match/ network/   (étapes suivantes)
+    ├── match/ network/   (étapes suivantes)
 ```
 
 Principes :
@@ -206,7 +221,8 @@ Principes :
 - Armes (statistiques, modèle 3D décrit en pièces, paramètres du son) : `src/config/weapons.js`. Ajouter une entrée crée une nouvelle arme sans toucher au code.
 - Règles de combat (atténuation, dispersion, recul, ramassage) et entraînement (mannequins, tourelle) : `src/config/combatConfig.js`.
 - Consommables : `src/config/consumables.js`.
-- Contenu d'entraînement (armes au sol, mannequins) : section `training` de `src/config/maps/testMap.js`.
+- Cartes : un fichier par carte dans `src/config/maps/` (terrain, canaux, peinture du sol, bâtiments, décors, végétation, points d'apparition, zone, zone d'entraînement), déclaré dans `src/config/maps/index.js`.
+- Butin (nombre, proportions, poids des armes) et disposition de l'entraînement : `src/config/lootConfig.js`. Phases de la zone : `src/config/zoneConfig.js`.
 - Nouveau personnage : créez un fichier dans `src/config/characters/` (liste de pièces posées sur la base commune de `kit.js`), puis ajoutez-le à `src/config/skins.js`. Limite : 2 000 triangles.
 - Nouvelle carte : créez un fichier dans `src/config/maps/` (relief, rivières, bâtiments, zones, accessoires, végétation, points d'apparition) puis déclarez-le dans `src/config/maps/index.js`.
 
