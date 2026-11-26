@@ -53,8 +53,10 @@ export default {
       ell('spine', [0.21, 0.06, 0.17], [0, 0.43, 0], C.red, { n: 4, seg: [10, 3] }),
       box('spine', [0.2, 0.06, 0.03], [0, 0.39, torsoZ(0, 0.39, 1, 0.01)], C.red),
       box('spine', [0.17, 0.3, 0.022], [0, 0.25, torsoZ(0, 0.25, -1, 0.02)], C.red),
-      box('spine', [0.025, 0.09, 0.012], [0, 0.25, torsoZ(0, 0.25, -1, 0.035)], C.white),
-      ...sym(box('spine', [0.02, 0.07, 0.012], [0.03, 0.235, torsoZ(0, 0.25, -1, 0.035)], C.white, { r: [0, 0, -0.65] })),
+      // Three-leaf emblem: central leaf and two leaves rising from its base.
+      box('spine', [0.026, 0.1, 0.012], [0, 0.26, torsoZ(0, 0.25, -1, 0.035)], C.white),
+      ...sym(box('spine', [0.022, 0.075, 0.012], [0.03, 0.245, torsoZ(0, 0.25, -1, 0.035)], C.white, { r: [0, 0, -0.75] })),
+      box('spine', [0.06, 0.014, 0.012], [0, 0.205, torsoZ(0, 0.25, -1, 0.035)], C.white),
       // Gold V collar and red chest plate.
       ...sym(box('spine', [0.03, 0.18, 0.02], [0.06, 0.31, torsoZ(0.06, 0.31)], C.gold, { r: [0, 0, -0.5] })),
       box('spine', [0.33, 0.15, 0.024], [0, 0.13, torsoZ(0, 0.13, 1, 0.002)], C.gold),

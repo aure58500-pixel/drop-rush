@@ -47,12 +47,12 @@ export default {
       // Silver chain and tag.
       ...sym(box('spine', [0.012, 0.12, 0.012], [0.04, 0.35, torsoZ(0.04, 0.35, 1, 0.02)], C.silver, { r: [0, 0, -0.4] })),
       box('spine', [0.04, 0.055, 0.012], [0, 0.27, torsoZ(0, 0.27, 1, 0.02)], C.silver),
-      // Yellow "R" on the back.
-      box('spine', [0.028, 0.15, 0.012], [-0.04, 0.24, torsoZ(0.04, 0.24, -1, 0.004)], C.yellow),
+      // Yellow "R" on the back (X mirrored: seen from behind, +X is on the viewer's left).
+      box('spine', [0.028, 0.15, 0.012], [0.04, 0.24, torsoZ(0.04, 0.24, -1, 0.004)], C.yellow),
       box('spine', [0.08, 0.026, 0.012], [0, 0.305, torsoZ(0, 0.305, -1, 0.004)], C.yellow),
-      box('spine', [0.07, 0.026, 0.012], [-0.005, 0.24, torsoZ(0, 0.24, -1, 0.004)], C.yellow),
-      box('spine', [0.026, 0.07, 0.012], [0.04, 0.272, torsoZ(0.04, 0.272, -1, 0.004)], C.yellow),
-      box('spine', [0.026, 0.09, 0.012], [0.025, 0.2, torsoZ(0.025, 0.2, -1, 0.004)], C.yellow, { r: [0, 0, 0.55] }),
+      box('spine', [0.07, 0.026, 0.012], [0.005, 0.24, torsoZ(0, 0.24, -1, 0.004)], C.yellow),
+      box('spine', [0.026, 0.07, 0.012], [-0.04, 0.272, torsoZ(0.04, 0.272, -1, 0.004)], C.yellow),
+      box('spine', [0.026, 0.09, 0.012], [-0.025, 0.2, torsoZ(0.025, 0.2, -1, 0.004)], C.yellow, { r: [0, 0, -0.55] }),
     ],
     arms: [
       ...limbs(box('arm', [0.022, 0.13, 0.12], [0.072, -0.07, 0], C.yellow)),

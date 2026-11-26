@@ -42,7 +42,6 @@ export default {
       // V collar and shoulder trims of the vest.
       ...sym(box('spine', [0.035, 0.22, 0.02], [0.06, 0.31, torsoZ(0.06, 0.31)], C.grey, { r: [0, 0, -0.45] })),
       ...sym(box('spine', [0.07, 0.03, 0.22], [0.18, 0.43, 0], C.grey)),
-      ...sym(box('spine', [0.035, 0.24, 0.02], [0.06, 0.3, torsoZ(0.06, 0.3, -1)], C.grey, { r: [0, 0, 0.3] })),
     ],
     belt: [
       torsoBand(0.03, 0.05, C.belt),

@@ -50,7 +50,7 @@ export default {
       ...sym(box('spine', [0.022, 0.3, 0.06], [0.232, 0.2, 0], C.purple)),
       torsoBand(-0.02, 0.03, C.purple),
       // White "V" on the back.
-      ...sym(box('spine', [0.035, 0.17, 0.012], [0.045, 0.27, torsoZ(0.045, 0.27, -1, 0.004)], C.white, { r: [0, 0, 0.45] })),
+      ...sym(box('spine', [0.035, 0.17, 0.012], [0.045, 0.27, torsoZ(0.045, 0.27, -1, 0.004)], C.white, { r: [0, 0, -0.45] })),
     ],
     arms: [
       ...limbRing('arm', -0.06, 0.079, 0.014, C.violet),

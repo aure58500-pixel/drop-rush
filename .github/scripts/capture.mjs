@@ -78,6 +78,33 @@ await page.evaluate(() => {
 await wait(1500);
 await shot('jeu-vue-epaule');
 
+// 4) Side view of the character holding the rifle (idle and after a shot).
+for (const [label, stance] of [['repos', false], ['tir', true]]) {
+  if (stance) {
+    await page.evaluate(() => window.__dropRush.player.onShot());
+    await wait(250); // let the animator reach the shooting pose
+  }
+  await page.evaluate(() => {
+    const g = window.__dropRush;
+    g.pause();
+    document.getElementById('ui-root').style.display = 'none';
+    const p = g.player.position;
+    const yaw = g.player.facingYaw + Math.PI / 2;
+    const cam = g.engine.camera;
+    cam.fov = 50;
+    cam.position.set(p.x + Math.sin(yaw) * 3.2, p.y + 1.1, p.z + Math.cos(yaw) * 3.2);
+    cam.lookAt(p.x, p.y + 0.9, p.z);
+    cam.updateProjectionMatrix();
+  });
+  await wait(300);
+  await shot(`arme-profil-${label}`);
+  await page.evaluate(() => {
+    document.getElementById('ui-root').style.display = '';
+    window.__dropRush.resume();
+  });
+  await wait(200);
+}
+
 const info = await page.evaluate(() => {
   const g = window.__dropRush;
   const gl = g.engine.renderer.getContext();
