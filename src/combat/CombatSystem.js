@@ -23,7 +23,7 @@ export class CombatSystem {
    * @param {import('../core/physics/CollisionWorld.js').CollisionWorld} o.world
    * @param {TargetRegistry} o.targets
    * @param {object} o.building BuildingSystem-like ({ damageFromHit, damageBuild, explode })
-   * @param {number} o.mapHalf
+   * @param {number} o.mapHalf projectiles beyond this distance on X or Z are removed
    * @param {object} [o.hooks] onTracer, onImpact, onTargetHit, onExplosion, onProjectileSpawn,
    *                           onProjectileMove, onProjectileEnd, onArrowStuck
    * @param {() => number} [o.random]

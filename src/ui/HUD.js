@@ -16,6 +16,8 @@ export class HUD {
       <div class="hud-status"><span class="status-chip"></span><span class="water-chip hidden">Dans l’eau · -30 %</span></div>
       <div class="perf-panel hidden"></div>
       <div class="boundary-warning hidden">Limite de la carte <strong></strong></div>
+      <div class="zone-info"></div>
+      <div class="out-of-zone hidden">Hors de la zone</div>
       <div class="help-panel hidden"></div>
       <div class="help-hint">${isTouch ? '' : `<kbd>${actionLabel('toggleHelp')}</kbd> Commandes`}</div>
       <div class="lock-hint hidden">Cliquez pour reprendre le contrôle</div>
@@ -33,6 +35,8 @@ export class HUD {
     this.waterChip = this.q('.water-chip');
     this.perf = this.q('.perf-panel');
     this.boundary = this.q('.boundary-warning');
+    this.zoneInfo = this.q('.zone-info');
+    this.outOfZone = this.q('.out-of-zone');
     this.help = this.q('.help-panel');
     this.help.appendChild(createControlsList(isTouch));
     this.lockHint = this.q('.lock-hint');
@@ -57,6 +61,23 @@ export class HUD {
     this.lockHint.classList.toggle('hidden', !visible);
   }
 
+  _updateZone(zone) {
+    this.outOfZone.classList.toggle('hidden', !zone?.outside);
+    let text = '';
+    if (zone) {
+      const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+      if (zone.shrinking) text = 'La zone se réduit';
+      else if (zone.next) text = `Zone : réduction dans ${fmt(zone.next.in)}`;
+      else text = 'Zone finale';
+      if (zone.damage > 0) text += ` · ${zone.damage} dégât${zone.damage > 1 ? 's' : ''}/s hors zone`;
+    }
+    if (text !== this._zoneText) {
+      this._zoneText = text;
+      this.zoneInfo.textContent = text;
+      this.zoneInfo.classList.toggle('hidden', !text);
+    }
+  }
+
   showElimination(reason, seconds) {
     this.elimination.classList.remove('hidden');
     this.q('.elim-reason').textContent = reason;
@@ -67,7 +88,8 @@ export class HUD {
     this.elimination.classList.add('hidden');
   }
 
-  update(dt, { player, aiming, boundaryDistance, warningDistance, perf, spreadPx = null, crosshair = 'default' }) {
+  update(dt, { player, aiming, boundaryDistance, warningDistance, perf, spreadPx = null, crosshair = 'default', zone = null }) {
+    this._updateZone(zone);
     // Crosshair gap = real weapon spread in pixels (or a movement-based gap with empty hands).
     const speed = player.controller.state.horizontalSpeed;
     let target = spreadPx;

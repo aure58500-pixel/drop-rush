@@ -6,7 +6,7 @@ import { SettingsPanel } from './SettingsPanel.js';
 import { createControlsList } from './ControlsHelp.js';
 
 export class MainMenu {
-  constructor(root, { profile, settings, isTouch, onPlay, onSkinChange, onFullscreen, onUiSound, onPreviewDrag }) {
+  constructor(root, { profile, settings, isTouch, onPlay, onSkinChange, onFullscreen, onUiSound, onPreviewDrag, maps = [], mapId, onMapChange }) {
     this.profile = profile;
     this.root = el('div', 'screen main-menu');
     this.root.innerHTML = `
@@ -34,8 +34,18 @@ export class MainMenu {
         </section>
         <section class="menu-card play-card">
           <h2>Jouer</h2>
+          <div class="field map-field">
+            <span>Carte <output class="map-name"></output></span>
+            <div class="map-grid">
+              ${maps.map((m) => `
+                <button class="map-tile" data-map="${m.id}" aria-label="${escapeHtml(m.name)}" title="${escapeHtml(m.name)}">
+                  <img src="${import.meta.env?.BASE_URL ?? '/'}${m.thumbnail}" alt="" loading="lazy" onerror="this.remove()">
+                  <span>${escapeHtml(m.name)}</span>
+                </button>`).join('')}
+            </div>
+          </div>
           <button class="btn btn-primary btn-xl" data-action="play">Entraînement</button>
-          <p class="hint">Terrain d'essai : déplacements, sauts, escaliers, rampes, tunnel accroupi et bâtiments.</p>
+          <p class="hint">Sur la carte choisie : armes à essayer, mannequins, construction et zone.</p>
           <button class="btn btn-ghost" data-action="settings">Paramètres</button>
           <button class="btn btn-ghost" data-action="controls">Commandes</button>
         </section>
@@ -78,6 +88,23 @@ export class MainMenu {
     });
     this._highlightSkin();
 
+    this.maps = maps;
+    this.setMap(mapId);
+    this.root.querySelectorAll('.map-tile').forEach((tile) => {
+      tile.addEventListener('click', async () => {
+        if (this.root.classList.contains('loading')) return;
+        onUiSound?.();
+        this.root.classList.add('loading');
+        tile.classList.add('busy');
+        try {
+          await onMapChange?.(tile.dataset.map);
+        } finally {
+          this.root.classList.remove('loading');
+          tile.classList.remove('busy');
+        }
+      });
+    });
+
     // Drag on the free area of the screen to turn the character preview.
     let drag = null;
     this.root.addEventListener('pointerdown', (e) => {
@@ -114,6 +141,13 @@ export class MainMenu {
   _highlightSkin() {
     this.root.querySelectorAll('.skin-chip').forEach((c) => c.classList.toggle('selected', c.dataset.skin === this.profile.skinId));
     this.root.querySelector('.skin-name').textContent = getSkin(this.profile.skinId).name;
+  }
+
+  setMap(id) {
+    this.mapId = id;
+    this.root.querySelectorAll('.map-tile').forEach((t) => t.classList.toggle('selected', t.dataset.map === id));
+    const m = this.maps.find((x) => x.id === id);
+    this.root.querySelector('.map-name').textContent = m ? m.name : '';
   }
 
   // Screen rectangle (pixels) not covered by the logo or the cards.

@@ -31,13 +31,13 @@ export class BuildingState {
    * @param {object} o
    * @param {import('../core/physics/CollisionWorld.js').CollisionWorld} o.world
    * @param {{getHeight:Function}} o.terrain
-   * @param {number} o.mapHalf half size of the map in meters
+   * @param {number} o.mapRadius builds must stay inside this circle (meters from the center)
    * @param {{onAdded?:Function,onRemoved?:Function,onDamaged?:Function,onDestroyed?:Function}} [o.hooks]
    */
-  constructor({ world, terrain, mapHalf, config = BUILD_CONFIG, hooks = {} }) {
+  constructor({ world, terrain, mapRadius, config = BUILD_CONFIG, hooks = {} }) {
     this.world = world;
     this.terrain = terrain;
-    this.mapHalf = mapHalf;
+    this.mapRadius = mapRadius;
     this.cfg = config;
     this.hooks = hooks;
     this.builds = new Map();
@@ -64,8 +64,9 @@ export class BuildingState {
 
     const shape = getPieceShape(c, cfg);
     const a = shape.aabb;
-    const limit = this.mapHalf - cfg.mapMargin;
-    if (a.minX < -limit || a.maxX > limit || a.minZ < -limit || a.maxZ > limit) return fail(BuildReason.BOUNDS, shape);
+    const limit = this.mapRadius - cfg.mapMargin;
+    const corners = [[a.minX, a.minZ], [a.maxX, a.minZ], [a.minX, a.maxZ], [a.maxX, a.maxZ]];
+    if (corners.some(([x, z]) => x * x + z * z > limit * limit)) return fail(BuildReason.BOUNDS, shape);
 
     for (const key of slotKeys(c)) if (this.slots.has(key)) return fail(BuildReason.OCCUPIED, shape);
 

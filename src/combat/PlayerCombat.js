@@ -29,6 +29,16 @@ export class PlayerCombat {
     this._aim = { origin: { x: 0, y: 0, z: 0 }, dir: { x: 0, y: 0, z: -1 } };
   }
 
+  // Points the player's combat at the systems of a newly loaded map.
+  attach({ combat, targets, loot, world, effects }) {
+    this.combat = combat;
+    this.targets = targets;
+    this.loot = loot;
+    this.world = world;
+    this.effects = effects;
+    this.focus = null;
+  }
+
   get loadout() {
     return this.player.loadout;
   }

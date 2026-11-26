@@ -1,30 +1,34 @@
-// Gameplay queries about the map: water slowdown, boundaries, out-of-map.
+// Gameplay rules tied to the map: water slowdown, circular boundary, sea and void.
 export class MapQueries {
   constructor(layout, killHeight) {
     this.terrain = layout.terrain;
-    this.half = layout.size / 2;
+    this.boundaryRadius = layout.boundary.radius;
     this.killHeight = killHeight;
-    this.oceanLevel = layout.water.oceanLevel;
-    this.oceanSlowFactor = layout.water.oceanSlowFactor;
+    this.seaLevel = layout.sea ? layout.sea.level : null;
   }
 
-  // Returns the slowdown factor if the feet are below a water surface, else 1.
+  // Canal water: slows the player while over the channel and below the water
+  // surface + jump allowance, so jumping inside a canal does not avoid the slowdown.
   getSpeedMultiplier(x, y, z) {
-    if (y < this.oceanLevel - 0.05) return this.oceanSlowFactor;
-    const hit = this.terrain.riverAt(x, z);
-    if (hit && y < hit.level - 0.05) return hit.river.slowFactor;
+    const w = this.terrain.waterAt(x, z);
+    if (w && y < w.level + w.jumpAllowance) return w.slowFactor;
     return 1;
   }
 
+  // Feet below the water surface (splash sounds).
   isInWater(x, y, z) {
-    return this.getSpeedMultiplier(x, y, z) < 1;
+    const w = this.terrain.waterAt(x, z);
+    return Boolean(w && y < w.level);
   }
 
   distanceToBoundary(x, z) {
-    return this.half - Math.max(Math.abs(x), Math.abs(z));
+    return this.boundaryRadius - Math.hypot(x, z);
   }
 
+  // Leaving the map, falling into the sea or into the void eliminates the player.
   isOutOfBounds(x, y, z) {
-    return Math.abs(x) > this.half || Math.abs(z) > this.half || y < this.killHeight;
+    if (x * x + z * z > this.boundaryRadius * this.boundaryRadius) return true;
+    if (this.seaLevel !== null && y < this.seaLevel) return true;
+    return y < this.killHeight;
   }
 }
