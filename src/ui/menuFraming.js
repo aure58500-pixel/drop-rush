@@ -1,7 +1,7 @@
 // Computes where the menu camera must place the character so it sits inside
 // the free screen area (not behind the menu cards). Pure function, no DOM.
-const CHARACTER_HEIGHT = 1.9; // meters, including a margin above the head
-const CHARACTER_WIDTH = 1.3; // meters, arms included
+const CHARACTER_HEIGHT = 2.05; // meters, hats and horns included
+const CHARACTER_WIDTH = 1.1; // meters, wide hats included
 const MIN_DISTANCE = 2.2;
 const MAX_DISTANCE = 7;
 

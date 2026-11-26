@@ -1,0 +1,45 @@
+name: Vérification de la PR
+
+# Builds the game and takes screenshots of the real rendering in Chrome.
+# Screenshots are pushed to a new branch "ci-shots-<run id>" (safe to delete).
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Installation des dépendances
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Captures d'écran (Chrome, WebGL logiciel)
+        run: |
+          npm install --no-save playwright@1.49.1
+          npx vite --port 5173 --strictPort > vite.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:5173/drop-rush/ > /dev/null && break; sleep 1; done
+          node .github/scripts/capture.mjs screenshots
+      - name: Publication des captures
+        if: always()
+        env:
+          BRANCH: ci-shots-${{ github.run_id }}
+        run: |
+          [ -d screenshots ] || exit 0
+          git checkout -q --orphan "$BRANCH"
+          git rm -rq --cached .
+          git add -f screenshots
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Captures du run ${{ github.run_id }}"
+          git push -q origin "$BRANCH"

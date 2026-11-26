@@ -2,8 +2,14 @@
 // Every joint target is computed from the movement state, then damped.
 import { clamp, damp, lerp } from '../core/utils/math.js';
 
+// Crouch pose (radians). The hip height that keeps the feet on the ground is
+// derived from these angles and the leg lengths of the model.
+const CROUCH = { leg: -1.2, knee: 2.1, spine: 1.0, neck: 0.15, hipsBack: 0.13 };
+// Rest-pose stride lengths for a leg of REFERENCE_LEG meters (thigh + shin).
+const REFERENCE_LEG = 0.82;
+
 const JOINT_KEYS = [
-  'hipsY', 'spineX', 'neckX',
+  'hipsY', 'hipsZ', 'spineX', 'neckX',
   'legL', 'legR', 'kneeL', 'kneeR',
   'armLx', 'armRx', 'armLz', 'armRz', 'elbowL', 'elbowR',
 ];
@@ -17,8 +23,15 @@ export class CharacterAnimator {
     this.time = 0;
     this.landImpulse = 0;
     this.onFootstep = null;
+    const legs = model.legDims;
+    this.standHip = model.hipHeight;
+    // _apply() subtracts 30 % of the spine pitch from the legs.
+    const a = CROUCH.leg - CROUCH.spine * 0.3;
+    this.crouchHip = legs.offset + legs.thigh * Math.cos(a) + legs.shin * Math.cos(a + CROUCH.knee) + legs.foot;
+    this.bodyScale = this.standHip / 0.92; // bob and landing amplitudes were tuned for 0.92 m hips
+    this.strideScale = (legs.thigh + legs.shin) / REFERENCE_LEG;
     this.pose = Object.fromEntries(JOINT_KEYS.map((k) => [k, 0]));
-    this.pose.hipsY = 0.92;
+    this.pose.hipsY = this.standHip;
     this.target = { ...this.pose };
   }
 
@@ -34,7 +47,9 @@ export class CharacterAnimator {
     const t = this.target;
     const walkT = clamp(s.speed / this.walkSpeed, 0, 1);
     const runT = clamp((s.speed - this.walkSpeed) / (this.sprintSpeed - this.walkSpeed), 0, 1);
-    const stride = s.crouched ? 1.1 : lerp(1.5, 2.4, runT);
+    const stride = (s.crouched ? 1.1 : lerp(1.5, 2.4, runT)) * this.strideScale;
+    const H = this.standHip;
+    const k = this.bodyScale;
 
     const prevPhase = this.phase;
     if (s.grounded) this.phase += (s.speed * dt * Math.PI * 2) / stride;
@@ -47,7 +62,7 @@ export class CharacterAnimator {
 
     if (!s.grounded) {
       const rising = s.vy > 0;
-      t.hipsY = 0.92;
+      t.hipsY = H;
       t.legL = rising ? -0.75 : -0.35;
       t.legR = rising ? -0.1 : -0.2;
       t.kneeL = rising ? 1.1 : 0.5;
@@ -61,12 +76,13 @@ export class CharacterAnimator {
       t.spineX = 0.08;
     } else if (s.crouched) {
       const swing = 0.35 * walkT;
-      t.hipsY = 0.52;
-      t.legL = -1.2 - sinP * swing;
-      t.legR = -1.2 + sinP * swing;
-      t.kneeL = 1.9 + Math.max(0, cosP) * swing;
-      t.kneeR = 1.9 + Math.max(0, -cosP) * swing;
-      t.spineX = 0.7;
+      t.hipsY = this.crouchHip;
+      t.hipsZ = -CROUCH.hipsBack; // sit back so the leaning head stays above the feet
+      t.legL = CROUCH.leg - sinP * swing;
+      t.legR = CROUCH.leg + sinP * swing;
+      t.kneeL = CROUCH.knee + Math.max(0, cosP) * swing;
+      t.kneeR = CROUCH.knee + Math.max(0, -cosP) * swing;
+      t.spineX = CROUCH.spine;
       t.armLx = -0.5 + sinP * 0.2 * walkT;
       t.armRx = -0.5 - sinP * 0.2 * walkT;
       t.armLz = 0.12;
@@ -77,7 +93,7 @@ export class CharacterAnimator {
       const legAmp = (0.5 + 0.4 * runT) * walkT;
       const kneeAmp = (0.5 + 0.8 * runT) * walkT;
       const armAmp = (0.35 + 0.5 * runT) * walkT;
-      t.hipsY = 0.92 - Math.abs(sinP) * 0.05 * walkT - runT * 0.03 + Math.sin(this.time * 2) * 0.004 * (1 - walkT);
+      t.hipsY = H - (Math.abs(sinP) * 0.05 * walkT + runT * 0.03 - Math.sin(this.time * 2) * 0.004 * (1 - walkT)) * k;
       t.legL = -sinP * legAmp;
       t.legR = sinP * legAmp;
       t.kneeL = 0.08 + Math.max(0, cosP) * kneeAmp;
@@ -91,11 +107,13 @@ export class CharacterAnimator {
       t.spineX = 0.04 + runT * 0.28 + Math.sin(this.time * 2) * 0.012 * (1 - walkT);
     }
 
+    if (!s.grounded || !s.crouched) t.hipsZ = 0;
     this._weaponPose(t, s, runT);
-    t.neckX = -clamp(s.pitch, -1, 1) * 0.35 - (s.crouched ? 0.3 : 0) - runT * 0.15;
+    // Crouched, the big head leans forward so it stays low (tunnels, cover).
+    t.neckX = -clamp(s.pitch, -1, 1) * (s.crouched ? 0.15 : 0.35) + (s.crouched ? CROUCH.neck : 0) - runT * 0.15;
 
     this.landImpulse = Math.max(0, this.landImpulse - dt * 5);
-    t.hipsY -= this.landImpulse * 0.14;
+    t.hipsY -= this.landImpulse * 0.14 * k;
 
     const rate = s.grounded ? 16 : 10;
     for (const k of JOINT_KEYS) this.pose[k] = damp(this.pose[k], t[k], rate, dt);
@@ -175,6 +193,7 @@ export class CharacterAnimator {
     const j = this.model.joints;
     const q = this.pose;
     j.hips.position.y = q.hipsY;
+    j.hips.position.z = q.hipsZ;
     j.spine.rotation.x = q.spineX;
     j.neck.rotation.x = q.neckX - q.spineX * 0.6;
     j.legL.rotation.x = q.legL - q.spineX * 0.3;

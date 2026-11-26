@@ -38,7 +38,7 @@
             ".write": "auth != null && $uid === auth.uid && (!newData.exists() || data.exists() || root.child('rooms').child($code).child('state').val() === 'lobby')",
             ".validate": "newData.hasChildren(['nickname', 'skin', 'alive'])",
             "nickname": { ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 16" },
-            "skin": { ".validate": "newData.isString() && newData.val().length <= 16" },
+            "skin": { ".validate": "newData.isString() && newData.val().length <= 32" },
             "x": { ".validate": "newData.isNumber()" },
             "y": { ".validate": "newData.isNumber()" },
             "z": { ".validate": "newData.isNumber()" },

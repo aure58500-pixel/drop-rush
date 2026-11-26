@@ -162,13 +162,14 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 28px; }
 .hint { color: var(--muted); font-size: 14px; margin: 0; line-height: 1.4; }
 .menu-footer { margin-top: 16px; color: rgba(255, 255, 255, 0.55); font-size: 12px; text-align: right; }
 
-.skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.skin-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .skin-chip {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 4px; border-radius: 12px; cursor: pointer;
   background: rgba(255, 255, 255, 0.05); border: 2px solid transparent; color: var(--text);
-  font: 700 12px var(--font); transition: transform 0.12s, border-color 0.15s, background 0.15s;
+  font: 700 11px/1.15 var(--font); text-align: center; transition: transform 0.12s, border-color 0.15s, background 0.15s;
 }
+.skin-name { color: var(--accent) !important; }
 .skin-chip i { width: 38px; height: 38px; border-radius: 50%; background: conic-gradient(var(--c1) 0 50%, var(--c2) 50% 80%, var(--c3) 80%); box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.25); }
 .skin-chip:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.1); }
 .skin-chip.selected { border-color: var(--accent); background: rgba(255, 209, 102, 0.14); }
@@ -426,7 +427,7 @@ body.is-touch .pickup-prompt { top: auto; left: auto; transform: none; right: ca
   .menu-card { width: min(270px, 100%); padding: 10px 12px; }
   .menu-card h2 { margin-bottom: 6px; font-size: 17px; }
   .play-card { gap: 8px; }
-  .skin-grid { grid-template-columns: repeat(6, 1fr); }
+  .skin-grid { grid-template-columns: repeat(5, 1fr); }
   .skin-chip span { display: none; }
   .skin-chip i { width: 26px; height: 26px; }
 }
@@ -455,7 +456,7 @@ body.is-touch .pickup-prompt { top: auto; left: auto; transform: none; right: ca
   .main-menu { background: linear-gradient(180deg, rgba(10, 14, 36, 0.1) 0%, rgba(10, 14, 36, 0.8) 60%); }
   .menu-body { margin-left: 0; justify-content: center; gap: 10px; }
   .menu-header { align-items: center; width: 100%; }
-  .skin-grid { grid-template-columns: repeat(6, 1fr); }
+  .skin-grid { grid-template-columns: repeat(5, 1fr); }
   .skin-chip span { display: none; }
   .play-card .hint { display: none; }
   /* Compact cards so the character stays visible between the logo and the cards. */

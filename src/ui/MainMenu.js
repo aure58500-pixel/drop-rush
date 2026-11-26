@@ -1,12 +1,12 @@
 // Home screen: logo, nickname, skin selection, training launch, settings.
-import { SKINS } from '../config/skins.js';
+import { SKINS, getSkin } from '../config/skins.js';
 import { NICKNAME_MAX, validateNickname } from '../core/Profile.js';
 import { el, escapeHtml } from './dom.js';
 import { SettingsPanel } from './SettingsPanel.js';
 import { createControlsList } from './ControlsHelp.js';
 
 export class MainMenu {
-  constructor(root, { profile, settings, isTouch, onPlay, onSkinChange, onFullscreen, onUiSound }) {
+  constructor(root, { profile, settings, isTouch, onPlay, onSkinChange, onFullscreen, onUiSound, onPreviewDrag }) {
     this.profile = profile;
     this.root = el('div', 'screen main-menu');
     this.root.innerHTML = `
@@ -23,10 +23,10 @@ export class MainMenu {
             <small class="field-error" aria-live="polite"></small>
           </label>
           <div class="field">
-            <span>Apparence</span>
+            <span>Personnage <output class="skin-name"></output></span>
             <div class="skin-grid">
               ${SKINS.map((s) => `
-                <button class="skin-chip" data-skin="${s.id}" title="${escapeHtml(s.name)}" aria-label="${escapeHtml(s.name)}" style="--c1:${s.colors.primary};--c2:${s.colors.secondary};--c3:${s.colors.accent}">
+                <button class="skin-chip" data-skin="${s.id}" title="${escapeHtml(s.name)}" aria-label="${escapeHtml(s.name)}" style="--c1:${s.ui.primary};--c2:${s.ui.secondary};--c3:${s.ui.accent}">
                   <i></i><span>${escapeHtml(s.name)}</span>
                 </button>`).join('')}
             </div>
@@ -78,6 +78,23 @@ export class MainMenu {
     });
     this._highlightSkin();
 
+    // Drag on the free area of the screen to turn the character preview.
+    let drag = null;
+    this.root.addEventListener('pointerdown', (e) => {
+      if (e.target !== this.root && !e.target.closest('.menu-header')) return;
+      drag = { id: e.pointerId, x: e.clientX };
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      onPreviewDrag?.(e.clientX - drag.x);
+      drag.x = e.clientX;
+    });
+    const end = (e) => {
+      if (drag && e.pointerId === drag.id) drag = null;
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+
     this.root.querySelector('[data-action="play"]').addEventListener('click', () => {
       onUiSound?.();
       if (commit()) onPlay();
@@ -96,6 +113,7 @@ export class MainMenu {
 
   _highlightSkin() {
     this.root.querySelectorAll('.skin-chip').forEach((c) => c.classList.toggle('selected', c.dataset.skin === this.profile.skinId));
+    this.root.querySelector('.skin-name').textContent = getSkin(this.profile.skinId).name;
   }
 
   // Screen rectangle (pixels) not covered by the logo or the cards.
