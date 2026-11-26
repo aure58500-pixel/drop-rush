@@ -46,7 +46,8 @@ export class Game {
     this.uiRoot = uiRoot;
     this.state = GameState.MENU;
     this.events = new EventBus();
-    this.menuOrbit = 0;
+    this.menuSpin = 0; // preview rotation of the character (radians)
+    this.menuSpinPause = 0;
     this.respawnTimer = 0;
     this.crouchToggled = false;
   }
@@ -225,6 +226,10 @@ export class Game {
       isTouch: this.isTouch,
       onPlay: () => this.startTraining(),
       onSkinChange: (id) => this.player.setSkin(id),
+      onPreviewDrag: (dx) => {
+        this.menuSpin += dx * 0.012;
+        this.menuSpinPause = 2.5;
+      },
       onFullscreen: fullscreen,
       onUiSound: () => {
         this.audio.unlock();
@@ -536,9 +541,11 @@ export class Game {
     };
   }
 
-  // Slow orbit around the idle character behind the main menu.
+  // Character preview behind the main menu: the character turns on itself
+  // (front, side, back) and can be turned by dragging the free area.
   updateMenuCamera(dt) {
-    this.menuOrbit += dt * 0.12;
+    this.menuSpinPause = Math.max(0, this.menuSpinPause - dt);
+    if (this.menuSpinPause === 0) this.menuSpin += dt * 0.55;
     const p = this.player.position;
     this.player.animator.update(dt, { speed: 0, grounded: true, vy: 0, crouched: false, aiming: false, pitch: 0 });
     const cam = this.engine.camera;
@@ -560,8 +567,9 @@ export class Game {
     f.shiftX += (t.shiftX - f.shiftX) * k;
     f.shiftY += (t.shiftY - f.shiftY) * k;
 
-    const yaw = this.player.facingYaw + 0.5 + Math.sin(this.menuOrbit) * 0.5;
-    const focusY = p.y + 0.95;
+    const yaw = this.player.facingYaw + 0.2;
+    this.player.model.root.rotation.y = this.player.facingYaw + this.menuSpin;
+    const focusY = p.y + 1.02;
     cam.position.set(p.x + Math.sin(yaw) * f.distance, focusY + 0.35, p.z + Math.cos(yaw) * f.distance);
     cam.lookAt(p.x, focusY, p.z);
     if (cam.fov !== MENU_FOV) cam.fov = MENU_FOV;

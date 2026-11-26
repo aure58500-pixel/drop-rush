@@ -167,7 +167,8 @@ drop-rush/
     │   ├── cameraConfig.js     FOV, distances, collisions caméra
     │   ├── controlsConfig.js   Touches, sensibilité, tactile
     │   ├── graphicsConfig.js   Préréglages de qualité, adaptation auto
-    │   ├── skins.js            Les 6 apparences
+    │   ├── skins.js            Liste des 5 personnages jouables
+    │   ├── characters/         Un fichier par personnage + kit.js (base chibi commune)
     │   └── maps/               Une carte = un fichier de données
     ├── core/                   Moteur : boucle, rendu, entrées, réglages, physique
     │   ├── Game.js             Orchestration des états et des systèmes
@@ -206,7 +207,7 @@ Principes :
 - Règles de combat (atténuation, dispersion, recul, ramassage) et entraînement (mannequins, tourelle) : `src/config/combatConfig.js`.
 - Consommables : `src/config/consumables.js`.
 - Contenu d'entraînement (armes au sol, mannequins) : section `training` de `src/config/maps/testMap.js`.
-- Nouvelle apparence : ajoutez une entrée dans `src/config/skins.js`.
+- Nouveau personnage : créez un fichier dans `src/config/characters/` (liste de pièces posées sur la base commune de `kit.js`), puis ajoutez-le à `src/config/skins.js`. Limite : 2 000 triangles.
 - Nouvelle carte : créez un fichier dans `src/config/maps/` (relief, rivières, bâtiments, zones, accessoires, végétation, points d'apparition) puis déclarez-le dans `src/config/maps/index.js`.
 
 ## Compatibilité

@@ -1,6 +1,6 @@
 // Player profile (nickname + skin) stored in localStorage.
 import { GAME_CONFIG } from '../config/gameConfig.js';
-import { DEFAULT_SKIN_ID, SKINS } from '../config/skins.js';
+import { normalizeSkinId } from '../config/skins.js';
 
 export const NICKNAME_MIN = 3;
 export const NICKNAME_MAX = 16;
@@ -28,7 +28,8 @@ export class Profile {
       data = {};
     }
     this.nickname = typeof data.nickname === 'string' && !validateNickname(data.nickname) ? data.nickname.trim() : generateNickname();
-    this.skinId = SKINS.some((s) => s.id === data.skinId) ? data.skinId : DEFAULT_SKIN_ID;
+    // Unknown ids (for example the old color skins) fall back to the default character.
+    this.skinId = normalizeSkinId(data.skinId);
     this.save();
   }
 
@@ -40,7 +41,7 @@ export class Profile {
   }
 
   setSkin(id) {
-    this.skinId = id;
+    this.skinId = normalizeSkinId(id);
     this.save();
   }
 
