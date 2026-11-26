@@ -53,6 +53,54 @@ export const SOUND_DEFINITIONS = {
     const rumble = lowpass(s, n, 0.28) * Math.exp(-t * 8) * (0.7 + 0.3 * Math.sin(t * 90));
     return crack * 0.7 + rumble;
   }, 23),
+  reload: (ctx) => render(ctx, 0.42, (t) => {
+    const click = (t0, f) => (t > t0 ? Math.sin((t - t0) * 2 * Math.PI * f) * Math.exp(-(t - t0) * 90) : 0);
+    return click(0, 1900) * 0.8 + click(0.08, 1300) + click(0.3, 2400) * 0.9;
+  }, 31),
+  reloadDone: (ctx) => render(ctx, 0.12, (t) => Math.sin(t * 2 * Math.PI * 2600) * Math.exp(-t * 70) + Math.sin(t * 2 * Math.PI * 700) * Math.exp(-t * 50) * 0.6, 32),
+  dryFire: (ctx) => render(ctx, 0.07, (t) => Math.sin(t * 2 * Math.PI * 3100) * Math.exp(-t * 140), 33),
+  equip: (ctx) => render(ctx, 0.2, (t, n, s) => lowpass(s, n, 0.4) * Math.exp(-t * 30) + Math.sin(t * 2 * Math.PI * 1600) * Math.exp(-t * 60) * 0.5, 34),
+  pickup: (ctx) => render(ctx, 0.22, (t) => Math.sin(t * 2 * Math.PI * (700 + t * 2600)) * Math.exp(-t * 14), 35),
+  hitmarker: (ctx) => render(ctx, 0.06, (t) => Math.sin(t * 2 * Math.PI * 2100) * Math.exp(-t * 70), 36),
+  headshot: (ctx) => render(ctx, 0.28, (t) => (Math.sin(t * 2 * Math.PI * 2800) + Math.sin(t * 2 * Math.PI * 4200) * 0.5) * Math.exp(-t * 16), 37),
+  kill: (ctx) => render(ctx, 0.4, (t) => Math.sin(t * 2 * Math.PI * (t < 0.1 ? 880 : 1320)) * Math.exp(-t * 7), 38),
+  hurt: (ctx) => render(ctx, 0.22, (t, n, s) => lowpass(s, n, 0.2) * Math.exp(-t * 18) + Math.sin(t * 2 * Math.PI * 140) * Math.exp(-t * 20) * 0.6, 39),
+  shieldBreak: (ctx) => render(ctx, 0.45, (t, n) => (n * 0.6 + Math.sin(t * 2 * Math.PI * (1800 - t * 2400))) * Math.exp(-t * 9), 40),
+  healDone: (ctx) => render(ctx, 0.45, (t) => Math.sin(t * 2 * Math.PI * (t < 0.15 ? 660 : t < 0.3 ? 880 : 1100)) * Math.exp(-t * 4) * 0.7, 41),
+  explosion: (ctx) => render(ctx, 1.4, (t, n, s) => {
+    const boom = Math.sin(t * 2 * Math.PI * (55 - t * 25)) * Math.exp(-t * 3.5);
+    const crackle = (n - s.lp2) * Math.exp(-t * 6) * 0.5;
+    s.lp2 += (n - s.lp2) * 0.6;
+    return boom + lowpass(s, n, 0.08) * Math.exp(-t * 2.2) * 1.4 + crackle;
+  }, 42),
+  impactStone: (ctx) => render(ctx, 0.12, (t, n, s) => (n - lowpass(s, n, 0.3)) * Math.exp(-t * 60), 43),
+  impactWood: (ctx) => render(ctx, 0.12, (t, n, s) => Math.sin(t * 2 * Math.PI * 330) * Math.exp(-t * 45) + lowpass(s, n, 0.35) * Math.exp(-t * 60) * 0.6, 44),
+  impactMetal: (ctx) => render(ctx, 0.3, (t) => (Math.sin(t * 2 * Math.PI * 2300) + Math.sin(t * 2 * Math.PI * 3550) * 0.6) * Math.exp(-t * 18), 45),
+  impactDirt: (ctx) => render(ctx, 0.14, (t, n, s) => lowpass(s, n, 0.15) * Math.exp(-t * 35), 46),
+  impactFlesh: (ctx) => render(ctx, 0.1, (t, n, s) => lowpass(s, n, 0.25) * Math.exp(-t * 50) + Math.sin(t * 2 * Math.PI * 210) * Math.exp(-t * 60) * 0.5, 47),
   click: (ctx) => render(ctx, 0.06, (t) => Math.sin(t * 2 * Math.PI * 1200) * Math.exp(-t * 80), 18),
   hover: (ctx) => render(ctx, 0.05, (t) => Math.sin(t * 2 * Math.PI * 900) * Math.exp(-t * 90) * 0.5, 19),
 };
+
+// Shot sound built from the `sound` parameters of a weapon config:
+// a noise crack, a pitched body that drops in frequency and a low-passed tail.
+// `kind: 'bow'` gives a string twang, `kind: 'rocket'` a long whoosh.
+export function renderShot(ctx, p) {
+  const twoPi = 2 * Math.PI;
+  return render(ctx, p.duration, (t, n, s) => {
+    if (p.kind === 'bow') {
+      const twang = Math.sin(t * twoPi * p.body * (1 + 0.35 * Math.exp(-t * 30))) * Math.exp(-t * p.bodyDecay);
+      return twang + (n - lowpass(s, n, 0.4)) * Math.exp(-t * p.crackDecay) * p.crack;
+    }
+    if (p.kind === 'rocket') {
+      const attack = 1 - Math.exp(-t * 60);
+      const whoosh = lowpass(s, n, p.lowpass + 0.25 * Math.exp(-t * 4)) * Math.exp(-t * p.tail) * attack;
+      return whoosh * 1.6 + Math.sin(t * twoPi * p.body * (1 - t * 0.4)) * Math.exp(-t * p.bodyDecay) * 0.7;
+    }
+    const crack = n * Math.exp(-t * p.crackDecay) * p.crack;
+    const body = Math.sin(t * twoPi * p.body * (1 - Math.min(0.6, t * 2.5))) * Math.exp(-t * p.bodyDecay);
+    s.lp2 += (n - s.lp2) * p.lowpass;
+    const tail = s.lp2 * Math.exp(-t * p.tail) * 1.3;
+    return crack + body + tail;
+  }, p.seed);
+}

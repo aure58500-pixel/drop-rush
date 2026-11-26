@@ -18,6 +18,10 @@ export const KEY_BINDINGS = {
   slot3: ['Digit3', 'Numpad3'],
   slot4: ['Digit4', 'Numpad4'],
   slot5: ['Digit5', 'Numpad5'],
+  useItem1: ['Digit6', 'Numpad6'],
+  useItem2: ['Digit7', 'Numpad7'],
+  useItem3: ['Digit8', 'Numpad8'],
+  useItem4: ['Digit9', 'Numpad9'],
   pause: ['Escape', 'KeyP'],
   toggleHelp: ['KeyH'],
 };
@@ -49,4 +53,5 @@ export const DEFAULT_KEY_LABELS = {
   Space: 'Espace', ShiftLeft: 'Maj gauche', ControlLeft: 'Ctrl gauche', Escape: 'Échap',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
   Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5',
+  Digit6: '6', Digit7: '7', Digit8: '8', Digit9: '9',
 };

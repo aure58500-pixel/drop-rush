@@ -26,6 +26,17 @@ import { BuildBar } from '../ui/BuildBar.js';
 import { BuildingSystem } from '../building/BuildingSystem.js';
 import { BUILD_CONFIG } from '../config/buildConfig.js';
 import { computeMenuFraming } from '../ui/menuFraming.js';
+import { CombatHUD } from '../ui/CombatHUD.js';
+import { COMBAT_CONFIG } from '../config/combatConfig.js';
+import { WEAPONS } from '../config/weapons.js';
+import { CombatSystem } from '../combat/CombatSystem.js';
+import { TargetRegistry } from '../combat/TargetRegistry.js';
+import { CombatEffects } from '../combat/CombatEffects.js';
+import { TrainingDummies } from '../combat/TrainingDummies.js';
+import { PlayerCombat } from '../combat/PlayerCombat.js';
+import { LootSystem } from '../loot/LootSystem.js';
+import { LootMeshes } from '../loot/LootMeshes.js';
+import * as THREE from 'three';
 
 export const GameState = Object.freeze({ MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused' });
 
@@ -73,6 +84,7 @@ export class Game {
       audio: this.audio,
       events: this.events,
     });
+    this.createCombat();
     this.spawnPlayer();
 
     this.quality = new QualityManager({
@@ -100,9 +112,99 @@ export class Game {
     this.map = new GameMap(def, { scene: this.engine.scene, world: this.world, killHeight: GAME_CONFIG.killHeight });
   }
 
-  spawnPlayer() {
+  // Combat: targets, hit resolution, effects, loot and training targets.
+  createCombat() {
+    const terrain = this.map.layout.terrain;
+    const scene = this.engine.scene;
+    this.targets = new TargetRegistry();
+    this.targets.add(this.player.target);
+    this.effects = new CombatEffects(scene, terrain);
+    this.effects.onShake = (center, radius) => {
+      const p = this.player.position;
+      const d = Math.hypot(center.x - p.x, center.y - p.y, center.z - p.z);
+      if (d < radius * 4) this.cameraRig.addRecoil((Math.random() - 0.3) * 3 * (1 - d / (radius * 4)));
+    };
+    this.combat = new CombatSystem({
+      world: this.world,
+      targets: this.targets,
+      building: this.building,
+      mapHalf: this.map.layout.size / 2,
+      hooks: {
+        onTracer: (from, to) => this.effects.tracer(from, to),
+        onImpact: (point, normal, surface) => this.onImpact(point, normal, surface),
+        onTargetHit: (target, result, info) => this.onTargetHit(target, result, info),
+        onExplosion: (center, radius) => {
+          this.effects.explosion(center, radius);
+          this.audio.play('explosion', { volume: 1, position: center });
+        },
+        onProjectileSpawn: (proj) => this.effects.projectileSpawned(proj),
+        onProjectileEnd: (proj) => this.effects.projectileEnded(proj),
+        onArrowStuck: (point, dir, attach) => {
+          this.effects.arrowStuck(point, dir, attach);
+          this.audio.play('impactWood', { volume: 0.6, position: point });
+        },
+        onShot: ({ weapon, muzzle, dir }) => {
+          this.effects.muzzleFlash(muzzle, dir, 0.8);
+          this.audio.play(`shot:${weapon.id}`, { volume: 0.6, position: muzzle });
+        },
+      },
+    });
+    this.lootMeshes = new LootMeshes(scene);
+    this.loot = new LootSystem({
+      hooks: {
+        onAdded: (item) => this.lootMeshes.add(item),
+        onRemoved: (item) => this.lootMeshes.remove(item),
+      },
+    });
+    const training = this.map.def.training || {};
+    for (const def of training.loot || []) this.loot.addSpawn(def, terrain.getHeight(def.x, def.z));
+    this.dummies = new TrainingDummies(training.dummies, {
+      scene, world: this.world, terrain, targets: this.targets, combat: this.combat, audio: this.audio,
+    });
+    this._projector = new THREE.Vector3();
+  }
+
+  onImpact(point, normal, surface) {
+    this.effects.impact(point, normal, surface);
+    const sound = surface === 'metal' ? 'impactMetal' : surface === 'wood' || surface === 'build' ? 'impactWood'
+      : surface === 'terrain' ? 'impactDirt' : surface === 'flesh' ? 'impactFlesh' : 'impactStone';
+    this.audio.play(sound, { volume: 0.45, pitchVariance: 0.15, position: point });
+  }
+
+  onTargetHit(target, result, info) {
+    const mine = info.ownerId === this.player.target.id;
+    if (mine && result.total > 0) {
+      this.combatHud.hitmarker({ headshot: info.headshot, kill: result.died });
+      this.audio.play(result.died ? 'kill' : info.headshot ? 'headshot' : 'hitmarker', { volume: result.died ? 0.8 : 0.55 });
+      if (result.shieldBroken) this.audio.play('shieldBreak', { volume: 0.5 });
+      const v = this._projector.set(info.point.x, info.point.y + 0.3, info.point.z).project(this.engine.camera);
+      if (v.z < 1) {
+        const { width, height } = this.engine.viewSize;
+        this.combatHud.damageNumber((v.x + 1) / 2 * width, (1 - v.y) / 2 * height, result.total, {
+          headshot: info.headshot, shield: result.shieldDamage > 0 && result.healthDamage === 0,
+        });
+      }
+    }
+    if (result.died && target !== this.player.target) {
+      const killer = mine ? 'Vous' : 'Tourelle';
+      const weaponName = info.weapon?.name || '';
+      this.combatHud.killfeed(`<b>${killer}</b> <i>${weaponName}${info.headshot ? ' · tête' : ''}</i> <b>${target.name || 'Cible'}</b>`);
+    }
+  }
+
+  resetTraining() {
+    this.building.setActive(false);
+    this.building.clear();
+    this.combat.clear();
+    this.effects.clear();
+    this.loot.reset();
+    this.dummies.reset();
+    this.combatHud?.clearTransient();
+  }
+
+  spawnPlayer({ keepItems = false } = {}) {
     const spawn = this.map.spawnPoints[0];
-    this.player.spawn(spawn);
+    this.player.spawn(spawn, { keepItems });
     this.cameraRig.yaw = spawn.yaw;
     this.cameraRig.pitch = -0.12;
     this.cameraRig.snap();
@@ -137,6 +239,23 @@ export class Game {
       onQuit: () => this.quitToMenu(),
       onFullscreen: fullscreen,
     });
+    this.combatHud = new CombatHUD(this.uiRoot, {
+      isTouch: this.isTouch,
+      onSlot: (i) => this.playerCombat.selectSlot(i),
+      onConsumable: (id) => this.playerCombat.useConsumable(id),
+      onPickup: () => this.playerCombat.pickup(),
+    });
+    this.playerCombat = new PlayerCombat({
+      player: this.player,
+      combat: this.combat,
+      targets: this.targets,
+      loot: this.loot,
+      world: this.world,
+      effects: this.effects,
+      audio: this.audio,
+      hud: this.combatHud,
+      events: this.events,
+    });
     this.buildBar = new BuildBar(this.uiRoot, {
       isTouch: this.isTouch,
       pieces: BUILD_CONFIG.pieceOrder.map((id) => ({ id, name: BUILD_CONFIG.pieces[id].name })),
@@ -155,12 +274,25 @@ export class Game {
     this.events.on('build:mode', ({ active }) => {
       this.buildBar.setVisible(active && this.state === GameState.PLAYING);
       this.touch?.setBuildMode(active);
+      this.combatHud.setBuildMode(active);
     });
-    this.events.on('player:eliminated', ({ reason }) => {
+    this.events.on('build:destroyed', ({ id }) => this.effects.removeArrowsOnBuild(id));
+    this.events.on('player:damaged', ({ amount, result, info }) => {
+      this.combatHud.hurt(Math.min(0.6, 0.15 + amount / 60));
+      this.audio.play(result.shieldDamage > 0 && result.healthDamage === 0 ? 'impactMetal' : 'hurt', { volume: 0.6 });
+      if (result.shieldBroken) this.audio.play('shieldBreak', { volume: 0.7 });
+      const src = info.source;
+      if (src) {
+        const p = this.player.position;
+        this.combatHud.damageFrom(Math.atan2(-(src.x - p.x), -(src.z - p.z)));
+      }
+    });
+    this.events.on('player:eliminated', ({ reason, by }) => {
       this.building.setActive(false);
       this.respawnTimer = GAME_CONFIG.trainingRespawnDelay;
-      const text = reason === 'outOfBounds' ? 'Vous êtes sorti de la carte.' : 'Vous avez été éliminé.';
-      this.hud.showElimination(text, this.respawnTimer);
+      this.eliminationText = reason === 'outOfBounds' ? 'Vous êtes sorti de la carte.'
+        : by ? `Vous avez été éliminé par ${by}.` : 'Vous avez été éliminé.';
+      this.hud.showElimination(this.eliminationText, this.respawnTimer);
     });
     this.input.onPointerLockChange = (locked) => {
       if (this.state === GameState.PLAYING && !locked && !this.isTouch) this.pause();
@@ -205,10 +337,10 @@ export class Game {
     this.state = GameState.PLAYING;
     this.input.gameActive = true;
     this.input.reset();
-    this.building.setActive(false);
-    this.building.clear();
+    this.resetTraining();
     this.spawnPlayer();
     this.hud.hideElimination();
+    this.combatHud.show();
     if (!this.isTouch) {
       this.input.requestPointerLock().then((ok) => this.hud.setLockHint(!ok));
     }
@@ -243,8 +375,8 @@ export class Game {
     this.input.exitPointerLock();
     this.input.gameActive = false;
     this.state = GameState.MENU;
-    this.building.setActive(false);
-    this.building.clear();
+    this.resetTraining();
+    this.combatHud.hide();
     this.spawnPlayer();
     this.mainMenu.show();
   }
@@ -270,6 +402,7 @@ export class Game {
   // Build mode input: B toggles, wheel / 1-3 pick the piece, X rotates,
   // left click places (hold to repeat), right click cancels.
   handleBuildInput(dt, wheel) {
+    // Returns the wheel steps left for the weapon slots.
     const input = this.input;
     const building = this.building;
     this.wheelCooldown = Math.max(0, (this.wheelCooldown || 0) - dt);
@@ -277,10 +410,10 @@ export class Game {
 
     if (!this.player.alive) {
       building.setActive(false);
-      return;
+      return 0;
     }
     if (input.wasPressed('build')) building.toggle();
-    if (!building.active) return;
+    if (!building.active) return wheel;
 
     if (wheel !== 0 && this.wheelCooldown <= 0) {
       building.cyclePiece(wheel > 0 ? 1 : -1);
@@ -295,10 +428,12 @@ export class Game {
     if (input.wasPressed('aim') || input.wasPressed('cancelBuild')) {
       building.setActive(false);
       this.suppressAim = input.isDown('aim'); // no zoom while the cancel click is still held
-      return;
+      this.suppressFire = input.isDown('fire');
+      return 0;
     }
-    // Shooting stays disabled for the whole build mode (weapons arrive in stage 2).
+    // Left click places pieces: shooting is disabled for the whole build mode.
     if (input.wasPressed('fire') || input.isDown('fire')) building.tryPlace();
+    return 0;
   }
 
   update(dt) {
@@ -313,21 +448,43 @@ export class Game {
       this.cameraRig.applyLook(look.x, look.y, this.settings.get('mouseSensitivity'), this.settings.get('invertY'));
       this.cameraRig.applyLook(look.touchX, look.touchY, TOUCH_SETTINGS.lookSensitivity, this.settings.get('invertY'));
 
-      this.handleBuildInput(dt, input.consumeWheel());
+      const wheel = this.handleBuildInput(dt, input.consumeWheel());
       const intent = this.buildIntent();
+      const building = this.building.active;
+      // A click that closed the build mode must not also fire.
+      if (this.suppressFire && !input.isDown('fire')) this.suppressFire = false;
       if (this.player.alive) {
+        this.playerCombat.adjustIntent(intent, input, building);
         this.player.update(dt, intent, this.cameraRig);
       } else {
         this.respawnTimer -= dt;
-        this.hud.showElimination('Vous êtes sorti de la carte.', this.respawnTimer);
+        this.hud.showElimination(this.eliminationText, this.respawnTimer);
         if (this.respawnTimer <= 0) {
-          this.spawnPlayer();
+          this.spawnPlayer({ keepItems: true });
           this.hud.hideElimination();
         }
       }
       const p = this.player.position;
-      this.cameraRig.update(dt, p, this.player.eyeHeight, intent.aiming && this.player.alive);
+      const weapon = this.player.loadout.activeWeapon;
+      this.cameraRig.update(dt, p, this.player.eyeHeight, intent.aiming && this.player.alive,
+        weapon?.aimFov ?? undefined, COMBAT_CONFIG.recoilRecovery);
       this.player.model.setVisible(this.player.alive && this.cameraRig.distanceToPivot > 0.7);
+
+      if (this.player.alive) {
+        this.playerCombat.update(dt, {
+          input: this.suppressFire ? this.blockFireInput(input) : input,
+          intent,
+          building,
+          cameraRig: this.cameraRig,
+          camera: this.engine.camera,
+          wheel,
+        });
+      }
+      this.combat.update(dt);
+      this.dummies.update(dt, this.engine.camera, this.player.target);
+      this.loot.update(dt);
+      this.lootMeshes.setFocus(this.playerCombat.focus?.id ?? null);
+      this.combatHud.update(dt, { loadout: this.player.loadout, pickup: this.playerCombat.prompt, camYaw: this.cameraRig.yaw });
 
       this.building.update(dt, {
         cam: this.cameraRig.position,
@@ -344,6 +501,8 @@ export class Game {
         aiming: intent.aiming,
         boundaryDistance: this.map.queries.distanceToBoundary(p.x, p.z),
         warningDistance: GAME_CONFIG.boundaryWarningDistance,
+        spreadPx: building ? null : this.playerCombat.spreadPx,
+        crosshair: weapon && !building ? (weapon.pellets > 1 ? 'shotgun' : 'default') : 'default',
         perf: showPerf ? {
           fps: this.quality.fps,
           quality: QUALITY_PRESETS[this.quality.level].label,
@@ -361,8 +520,20 @@ export class Game {
       if (input.wasPressed('pause') && !this.isTouch) this.resume();
     }
 
+    this.effects.update(dt, WEAPONS.crossbow.projectile.stickSeconds);
+    this.lootMeshes.update(dt);
+    const cam = this.engine.camera.position;
+    this.audio.setListener(cam.x, cam.y, cam.z, this.cameraRig.yaw);
     this.map.update(dt, this.engine.camera, this.player.position);
     input.endFrame();
+  }
+
+  // Input view with the fire button released (used right after leaving build mode).
+  blockFireInput(input) {
+    return {
+      isDown: (a) => (a === 'fire' ? false : input.isDown(a)),
+      wasPressed: (a) => (a === 'fire' ? false : input.wasPressed(a)),
+    };
   }
 
   // Slow orbit around the idle character behind the main menu.
