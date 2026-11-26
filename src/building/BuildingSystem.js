@@ -8,7 +8,7 @@ import { resolveTarget } from './BuildTargeting.js';
 import { getPieceShape } from './BuildGeometry.js';
 
 export class BuildingSystem {
-  constructor({ scene, world, terrain, mapSize, audio, events, ownerId = 'local', config = BUILD_CONFIG }) {
+  constructor({ scene, world, terrain, mapRadius, audio, events, ownerId = 'local', config = BUILD_CONFIG }) {
     this.cfg = config;
     this.world = world;
     this.terrain = terrain;
@@ -21,7 +21,7 @@ export class BuildingSystem {
     this.state = new BuildingState({
       world,
       terrain,
-      mapHalf: mapSize / 2,
+      mapRadius,
       config,
       hooks: {
         onAdded: (b, opts) => this.meshes.add(b, opts),
@@ -148,6 +148,12 @@ export class BuildingSystem {
 
   clear() {
     this.state.clear();
+  }
+
+  dispose() {
+    this.setActive(false);
+    this.meshes.dispose();
+    this.debris.dispose();
   }
 
   _onDestroyed(b) {

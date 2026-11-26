@@ -15,108 +15,103 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') log.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => log.push(`[pageerror] ${e.message}`));
-
 const shot = (name) => page.screenshot({ path: `${out}/${name}.jpg`, type: 'jpeg', quality: 82 });
 const wait = (ms) => page.waitForTimeout(ms);
 
+const t0 = Date.now();
 await page.goto(URL);
 await page.waitForFunction(() => window.__dropRush?.state === 'menu', null, { timeout: 90000 });
-await wait(1500);
-const skins = await page.evaluate(() => [...document.querySelectorAll('.skin-chip')].map((b) => b.dataset.skin));
-log.push(`skins in menu: ${skins.join(', ')}`);
+log.push(`first load (page + default map, software WebGL): ${Date.now() - t0} ms`);
+await wait(1000);
 
-// 1) Menu preview: front, side and back of every character.
-for (const id of skins) {
-  await page.click(`.skin-chip[data-skin="${id}"]`);
-  for (const [label, angle] of [['face', 0], ['profil', Math.PI / 2], ['dos', Math.PI]]) {
-    await page.evaluate((a) => {
-      const g = window.__dropRush;
-      g.menuSpin = a;
-      g.menuSpinPause = 1e9;
-    }, angle);
-    await wait(500);
-    await shot(`menu-${id}-${label}`);
-  }
-}
+// Camera views per map: [name, camera polar (deg, r, y), target polar (deg, r, y)].
+const VIEWS = {
+  ile: [
+    ['vue-ensemble', [180, 430, 330], [0, 0, 0], 55],
+    ['couronne-pont-sud', [180, 152, 4], [0, 0, 3], 65],
+    ['tour-grue', [40, 186, 7], [44, 245, 12], 65],
+    ['burger-heliport', [108, 186, 6], [108, 232, 5], 65],
+    ['hangar-conteneurs', [318, 192, 7], [318, 250, 4], 65],
+    ['cascades', [180, 395, 14], [180, 345, -4], 60],
+  ],
+  canaux: [
+    ['vue-ensemble', [180, 370, 290], [0, 0, 0], 55],
+    ['fontaine-pont', [180, 96, 5], [0, 0, 2], 65],
+    ['trampoline-canal', [0, 92, 6], [22, 88, 0], 65],
+    ['chateau-eau-horloge', [0, 168, 6], [0, 222, 12], 65],
+    ['immeubles-heliport', [45, 175, 8], [45, 228, 9], 65],
+  ],
+  'cite-ruines': [
+    ['vue-ensemble', [180, 430, 330], [0, 0, 0], 55],
+    ['porte-sud', [180, 362, 7], [180, 315, 3], 65],
+    ['ruines', [262, 118, 7], [270, 160, 3], 65],
+    ['heliport-est', [102, 112, 8], [102, 152, 5], 65],
+    ['burger-tour', [322, 110, 6], [325, 175, 8], 65],
+    ['garage-conteneurs', [8, 140, 6], [10, 190, 4], 65],
+  ],
+};
 
-// 2) The five characters seen from 15 m in the training map (front and back).
-await page.evaluate(() => window.__dropRush.startTraining());
-await wait(1500);
-await page.evaluate(() => {
-  const g = window.__dropRush;
-  g.pause();
-  document.getElementById('ui-root').style.display = 'none';
-});
-for (const id of skins) {
-  for (const [label, turn] of [['face', 0], ['dos', Math.PI]]) {
-    await page.evaluate(({ id, turn }) => {
-      const g = window.__dropRush;
-      g.player.setSkin(id);
-      const p = g.player.position;
-      const yaw = g.player.facingYaw;
-      g.player.model.root.rotation.y = yaw + turn;
-      const cam = g.engine.camera;
-      cam.fov = 75;
-      cam.clearViewOffset();
-      cam.position.set(p.x + Math.sin(yaw) * 15, p.y + 1.6, p.z + Math.cos(yaw) * 15);
-      cam.lookAt(p.x, p.y + 1.0, p.z);
-      cam.updateProjectionMatrix();
-    }, { id, turn });
-    await wait(400);
-    await shot(`15m-${id}-${label}`);
-  }
-}
-
-// 3) Third-person view with a weapon in hand.
-await page.evaluate(() => {
-  const g = window.__dropRush;
-  document.getElementById('ui-root').style.display = '';
-  g.player.setSkin('ninja_bleu');
-  g.player.loadout.pickWeapon({ uid: 'capture', id: 'assaultRifle', mag: 30, reserve: 120 });
-  g.resume();
-});
-await wait(1500);
-await shot('jeu-vue-epaule');
-
-// 4) Side view of the character holding the rifle (idle and after a shot).
-for (const [label, stance] of [['repos', false], ['tir', true]]) {
-  if (stance) {
-    await page.evaluate(() => window.__dropRush.player.onShot());
-    await wait(250); // let the animator reach the shooting pose
-  }
+const maps = await page.evaluate(() => [...document.querySelectorAll('.map-tile')].map((t) => t.dataset.map));
+log.push(`maps in menu: ${maps.join(', ')}`);
+for (const id of maps) {
+  const s0 = Date.now();
+  await page.click(`.map-tile[data-map="${id}"]`);
+  await page.waitForFunction((id) => window.__dropRush.mapId === id && !window.__dropRush.mapSwitching, id, { timeout: 60000 });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const switchMs = Date.now() - s0;
+  await wait(600);
+  await shot(`${id}-menu`);
+  await page.evaluate(() => window.__dropRush.startTraining());
+  await wait(1200);
+  await shot(`${id}-jeu`);
   await page.evaluate(() => {
     const g = window.__dropRush;
     g.pause();
     document.getElementById('ui-root').style.display = 'none';
-    const p = g.player.position;
-    const yaw = g.player.facingYaw + Math.PI / 2;
-    const cam = g.engine.camera;
-    cam.fov = 50;
-    cam.position.set(p.x + Math.sin(yaw) * 3.2, p.y + 1.1, p.z + Math.cos(yaw) * 3.2);
-    cam.lookAt(p.x, p.y + 0.9, p.z);
-    cam.updateProjectionMatrix();
   });
-  await wait(300);
-  await shot(`arme-profil-${label}`);
+  for (const [name, cam, target, fov] of VIEWS[id] || []) {
+    const info = await page.evaluate(({ cam, target, fov }) => {
+      const g = window.__dropRush;
+      const P = ([a, r, y]) => [Math.sin((a * Math.PI) / 180) * r, y, -Math.cos((a * Math.PI) / 180) * r];
+      const c = g.engine.camera;
+      const [cx, cy, cz] = P(cam);
+      const [tx, ty, tz] = P(target);
+      c.fov = fov;
+      c.clearViewOffset();
+      c.position.set(cx, cy, cz);
+      c.lookAt(tx, ty, tz);
+      // Overviews are far away: open the view range and hide the zone wall for the picture.
+      const overview = cy > 100;
+      g.zoneMesh.mesh.visible = !overview;
+      c.far = overview ? 3000 : 470;
+      g.scene = g.engine.scene;
+      g.engine.scene.fog.far = overview ? 3000 : 480;
+      g.map.sky.setRadius(overview ? 1500 : 460);
+      c.updateProjectionMatrix();
+      g.engine.render();
+      return { calls: g.engine.drawCalls, triangles: g.engine.triangles };
+    }, { cam, target, fov });
+    await wait(250);
+    await shot(`${id}-${name}`);
+    log.push(`${id} ${name}: ${info.triangles} triangles, ${info.calls} draw calls`);
+  }
+  const stats = await page.evaluate(() => {
+    const g = window.__dropRush;
+    return { buildMs: Math.round(g.map.stats.buildMs), mapTriangles: g.map.stats.triangles, loot: g.map.layout.loot.length, spawns: g.map.layout.spawnPoints.length };
+  });
+  log.push(`${id}: map switch ${switchMs} ms (generation + meshes ${stats.buildMs} ms), ${stats.mapTriangles} triangles in total, ${stats.loot} loot points, ${stats.spawns} spawn points`);
   await page.evaluate(() => {
     document.getElementById('ui-root').style.display = '';
-    window.__dropRush.resume();
+    window.__dropRush.quitToMenu();
   });
-  await wait(200);
+  await wait(300);
 }
 
-const info = await page.evaluate(() => {
-  const g = window.__dropRush;
-  const gl = g.engine.renderer.getContext();
-  return {
-    webgl2: gl instanceof WebGL2RenderingContext,
-    renderer: gl.getParameter(gl.RENDERER),
-    drawCalls: g.engine.drawCalls,
-    triangles: g.engine.triangles,
-    characterTriangles: g.player.model.triangles,
-  };
+const gl = await page.evaluate(() => {
+  const ctx = window.__dropRush.engine.renderer.getContext();
+  return { webgl2: ctx instanceof WebGL2RenderingContext, renderer: ctx.getParameter(ctx.RENDERER) };
 });
-log.push(`render: ${JSON.stringify(info)}`);
+log.push(`renderer: ${JSON.stringify(gl)}`);
 writeFileSync(`${out}/log.txt`, `${log.join('\n')}\n`);
 console.log(log.join('\n'));
 await browser.close();

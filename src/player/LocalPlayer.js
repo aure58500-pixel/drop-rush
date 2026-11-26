@@ -12,6 +12,7 @@ import { CharacterModel } from './CharacterModel.js';
 import { CharacterAnimator } from './CharacterAnimator.js';
 import { PlayerLoadout } from './PlayerLoadout.js';
 import { createWeaponMesh } from '../weapons/WeaponModels.js';
+import { TrampolineRule } from './Trampoline.js';
 
 export const LOCAL_PLAYER_ID = 'local';
 
@@ -28,6 +29,7 @@ export class LocalPlayer {
     this.animator = new CharacterAnimator(this.model, PLAYER_CONFIG.movement);
     this.animator.onFootstep = (runT) => this._footstep(runT);
     this.loadout = new PlayerLoadout();
+    this.trampoline = new TrampolineRule(PLAYER_CONFIG.movement.gravity);
     this.weaponMeshes = new Map();
 
     this.alive = true;
@@ -56,6 +58,13 @@ export class LocalPlayer {
 
   get position() {
     return this.motor.position;
+  }
+
+  // Moves the character to another map (new collision world and rules).
+  setWorld(world, queries) {
+    this.world = world;
+    this.queries = queries;
+    this.motor.world = world;
   }
 
   get health() {
@@ -147,9 +156,13 @@ export class LocalPlayer {
     this.aiming = intent.aiming;
 
     const speedMultiplier = this.queries.getSpeedMultiplier(p.x, p.y, p.z);
-    this.inWater = speedMultiplier < 1;
+    this.inWater = this.queries.isInWater(p.x, p.y, p.z);
     const wasGrounded = motor.grounded;
     const state = this.controller.update(dt, { ...intent, yaw: cameraRig.yaw }, motor, speedMultiplier);
+    if (this.trampoline.update(dt, motor, this.controller, cameraRig.yaw)) {
+      this.audio?.play('jump', { volume: 0.8, pitch: 0.7 });
+      this.events.emit('player:trampoline', {});
+    }
 
     if (state.jumped) this.audio?.play('jump', { volume: 0.5, pitchVariance: 0.08 });
     if (motor.landedThisFrame && !wasGrounded) {

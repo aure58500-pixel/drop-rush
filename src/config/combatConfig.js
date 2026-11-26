@@ -34,7 +34,7 @@ export const TRAINING_CONFIG = {
   turret: {
     damage: 6,
     interval: 1.6, // seconds between shots
-    range: 35,
+    range: 30,
     spread: 2.2, // degrees
     windup: 0.6, // seconds after acquiring the target
   },

@@ -306,6 +306,15 @@ export class CombatEffects {
     }
   }
 
+  dispose() {
+    this.clear();
+    this.group.traverse((o) => {
+      o.geometry?.dispose();
+      o.material?.dispose?.();
+    });
+    this.scene.remove(this.group);
+  }
+
   clear() {
     this.tracers.length = 0;
     this.particles.length = 0;

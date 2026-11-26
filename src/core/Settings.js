@@ -2,6 +2,7 @@
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { MOUSE_SETTINGS } from '../config/controlsConfig.js';
 import { clamp } from './utils/math.js';
+import { normalizeMapId } from '../config/maps/index.js';
 
 const DEFAULTS = {
   mouseSensitivity: MOUSE_SETTINGS.defaultSensitivity,
@@ -10,6 +11,7 @@ const DEFAULTS = {
   quality: 'auto', // auto | high | medium | low
   showFps: false,
   crouchToggle: false,
+  mapId: 'ile',
 };
 
 export class Settings {
@@ -26,6 +28,7 @@ export class Settings {
       MOUSE_SETTINGS.minSensitivity, MOUSE_SETTINGS.maxSensitivity);
     this.values.volume = clamp(Number(this.values.volume), 0, 1);
     if (!['auto', 'high', 'medium', 'low'].includes(this.values.quality)) this.values.quality = 'auto';
+    this.values.mapId = normalizeMapId(this.values.mapId);
   }
 
   get(key) {

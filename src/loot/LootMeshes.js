@@ -91,6 +91,11 @@ export class LootMeshes {
     this.entries.delete(item.id);
   }
 
+  dispose() {
+    this.scene.remove(this.group);
+    this.entries.clear();
+  }
+
   // Highlights the item that can be picked up.
   setFocus(id) {
     for (const [key, e] of this.entries) e.root.scale.setScalar(key === id ? 1.15 : 1);

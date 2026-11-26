@@ -240,6 +240,15 @@ export class TrainingDummies {
     this.combat.hooks.onShot?.({ weapon: TURRET_WEAPON, muzzle: m, dir, ownerId: d.id });
   }
 
+  dispose(scene) {
+    for (const d of this.list) {
+      scene.remove(d.model.group, d.bar.group);
+      if (d.collider) this.world.remove(d.collider);
+      this.targets.remove(d.id);
+    }
+    this.list = [];
+  }
+
   reset() {
     for (const d of this.list) {
       if (!d.alive) d.respawn();

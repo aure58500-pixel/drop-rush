@@ -1,7 +1,7 @@
 // Game orchestrator: owns systems, game states (menu / playing / paused),
 // the main loop and the wiring between gameplay, rendering and UI.
 import { GAME_CONFIG } from '../config/gameConfig.js';
-import { loadMapDefinition } from '../config/maps/index.js';
+import { loadMapDefinition, normalizeMapId, MAP_REGISTRY } from '../config/maps/index.js';
 import { QUALITY_PRESETS } from '../config/graphicsConfig.js';
 import { TOUCH_SETTINGS } from '../config/controlsConfig.js';
 import { PLAYER_CONFIG } from '../config/playerConfig.js';
@@ -14,7 +14,6 @@ import { QualityManager } from './QualityManager.js';
 import { Input } from './input/Input.js';
 import { TouchControls } from './input/TouchControls.js';
 import { initKeyLabels, isTouchDevice } from './input/keyLabels.js';
-import { CollisionWorld } from './physics/CollisionWorld.js';
 import { GameMap } from '../map/GameMap.js';
 import { LocalPlayer } from '../player/LocalPlayer.js';
 import { ThirdPersonCamera } from '../player/ThirdPersonCamera.js';
@@ -37,6 +36,8 @@ import { PlayerCombat } from '../combat/PlayerCombat.js';
 import { LootSystem } from '../loot/LootSystem.js';
 import { LootMeshes } from '../loot/LootMeshes.js';
 import * as THREE from 'three';
+import { ZoneSystem } from '../zone/ZoneSystem.js';
+import { ZoneMesh } from '../zone/ZoneMesh.js';
 
 export const GameState = Object.freeze({ MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused' });
 
@@ -65,8 +66,11 @@ export class Game {
     this.audio = new AudioManager(this.settings.get('volume'));
 
     onProgress(0.2, 'Chargement de la carte…');
-    await this.loadMap(GAME_CONFIG.defaultMapId);
+    await this.loadMap(this.settings.get('mapId') || GAME_CONFIG.defaultMapId);
     onProgress(0.75, 'Préparation du personnage…');
+    // Optional speed-up of the zone timer for testing: ?zoneSpeed=10
+    this.zoneSpeed = Math.max(1, Number(new URLSearchParams(window.location.search).get('zoneSpeed')) || 1);
+    this.zoneMesh = new ZoneMesh(this.engine.scene);
 
     this.player = new LocalPlayer({
       world: this.world,
@@ -77,15 +81,7 @@ export class Game {
       events: this.events,
     });
     this.cameraRig = new ThirdPersonCamera(this.engine.camera, this.world);
-    this.building = new BuildingSystem({
-      scene: this.engine.scene,
-      world: this.world,
-      terrain: this.map.layout.terrain,
-      mapSize: this.map.layout.size,
-      audio: this.audio,
-      events: this.events,
-    });
-    this.createCombat();
+    this.createWorldSystems();
     this.spawnPlayer();
 
     this.quality = new QualityManager({
@@ -108,9 +104,60 @@ export class Game {
   }
 
   async loadMap(id) {
-    const def = await loadMapDefinition(id);
-    this.world = new CollisionWorld({ cellSize: 8 });
-    this.map = new GameMap(def, { scene: this.engine.scene, world: this.world, killHeight: GAME_CONFIG.killHeight });
+    this.mapId = normalizeMapId(id);
+    const def = await loadMapDefinition(this.mapId);
+    const t0 = performance.now();
+    this.map = new GameMap(def, { scene: this.engine.scene, killHeight: GAME_CONFIG.killHeight });
+    this.world = this.map.world;
+    this.mapLoadMs = performance.now() - t0;
+  }
+
+  // Systems that depend on the current map (collisions, builds, combat, loot, zone).
+  createWorldSystems() {
+    this.building = new BuildingSystem({
+      scene: this.engine.scene,
+      world: this.world,
+      terrain: this.map.layout.terrain,
+      mapRadius: this.map.layout.buildRadius,
+      audio: this.audio,
+      events: this.events,
+    });
+    this.createCombat();
+    this.zone = new ZoneSystem(this.map.def, this.map.def.seed);
+    this.zoneTime = 0;
+    this.zoneTick = 0;
+  }
+
+  disposeWorldSystems() {
+    this.building.dispose();
+    this.combat.clear();
+    this.effects.dispose();
+    this.lootMeshes.dispose();
+    this.dummies.dispose(this.engine.scene);
+    this.zoneMesh.hide();
+  }
+
+  // Switches the map (main menu choice). Resolves once the new map is ready.
+  async setMap(id) {
+    const next = normalizeMapId(id);
+    this.settings.set('mapId', next);
+    if (next === this.mapId || this.mapSwitching) return;
+    this.mapSwitching = true;
+    try {
+      this.disposeWorldSystems();
+      this.map.dispose();
+      await this.loadMap(next);
+      this.player.setWorld(this.world, this.map.queries);
+      this.cameraRig.world = this.world;
+      this.createWorldSystems();
+      this.playerCombat.attach({ combat: this.combat, targets: this.targets, loot: this.loot, world: this.world, effects: this.effects });
+      this.applyQuality(this.quality.preset);
+      this.spawnPlayer();
+      this.menuFrame = null;
+      this.mainMenu.setMap(next);
+    } finally {
+      this.mapSwitching = false;
+    }
   }
 
   // Combat: targets, hit resolution, effects, loot and training targets.
@@ -129,7 +176,7 @@ export class Game {
       world: this.world,
       targets: this.targets,
       building: this.building,
-      mapHalf: this.map.layout.size / 2,
+      mapHalf: this.map.layout.boundary.radius + 40,
       hooks: {
         onTracer: (from, to) => this.effects.tracer(from, to),
         onImpact: (point, normal, surface) => this.onImpact(point, normal, surface),
@@ -157,9 +204,11 @@ export class Game {
         onRemoved: (item) => this.lootMeshes.remove(item),
       },
     });
-    const training = this.map.def.training || {};
-    for (const def of training.loot || []) this.loot.addSpawn(def, terrain.getHeight(def.x, def.z));
-    this.dummies = new TrainingDummies(training.dummies, {
+    const layout = this.map.layout;
+    // Training rack next to the spawn, then the 150 loot points of the map (they come back in training).
+    for (const def of layout.training.loot) this.loot.addSpawn(def, def.y);
+    for (const def of layout.loot) this.loot.addSpawn(def, def.y);
+    this.dummies = new TrainingDummies(layout.training.dummies, {
       scene, world: this.world, terrain, targets: this.targets, combat: this.combat, audio: this.audio,
     });
     this._projector = new THREE.Vector3();
@@ -204,7 +253,7 @@ export class Game {
   }
 
   spawnPlayer({ keepItems = false } = {}) {
-    const spawn = this.map.spawnPoints[0];
+    const spawn = this.map.layout.training.player || this.map.spawnPoints[0];
     this.player.spawn(spawn, { keepItems });
     this.cameraRig.yaw = spawn.yaw;
     this.cameraRig.pitch = -0.12;
@@ -225,6 +274,9 @@ export class Game {
       settings: this.settings,
       isTouch: this.isTouch,
       onPlay: () => this.startTraining(),
+      maps: Object.entries(MAP_REGISTRY).map(([id, m]) => ({ id, name: m.name, thumbnail: m.thumbnail })),
+      mapId: this.mapId,
+      onMapChange: (id) => this.setMap(id),
       onSkinChange: (id) => this.player.setSkin(id),
       onPreviewDrag: (dx) => {
         this.menuSpin += dx * 0.012;
@@ -295,7 +347,7 @@ export class Game {
     this.events.on('player:eliminated', ({ reason, by }) => {
       this.building.setActive(false);
       this.respawnTimer = GAME_CONFIG.trainingRespawnDelay;
-      this.eliminationText = reason === 'outOfBounds' ? 'Vous êtes sorti de la carte.'
+      this.eliminationText = reason === 'outOfBounds' ? 'Vous êtes sorti de la carte (chute ou mer).'
         : by ? `Vous avez été éliminé par ${by}.` : 'Vous avez été éliminé.';
       this.hud.showElimination(this.eliminationText, this.respawnTimer);
     });
@@ -343,6 +395,7 @@ export class Game {
     this.input.gameActive = true;
     this.input.reset();
     this.resetTraining();
+    this.zoneTime = 0;
     this.spawnPlayer();
     this.hud.hideElimination();
     this.combatHud.show();
@@ -379,6 +432,7 @@ export class Game {
     this.touch?.setVisible(false);
     this.input.exitPointerLock();
     this.input.gameActive = false;
+    this.zoneMesh.hide();
     this.state = GameState.MENU;
     this.resetTraining();
     this.combatHud.hide();
@@ -465,6 +519,7 @@ export class Game {
         this.respawnTimer -= dt;
         this.hud.showElimination(this.eliminationText, this.respawnTimer);
         if (this.respawnTimer <= 0) {
+          this.zoneTime = 0; // training: the zone starts over after a respawn
           this.spawnPlayer({ keepItems: true });
           this.hud.hideElimination();
         }
@@ -486,6 +541,7 @@ export class Game {
         });
       }
       this.combat.update(dt);
+      this.updateZone(dt);
       this.dummies.update(dt, this.engine.camera, this.player.target);
       this.loot.update(dt);
       this.lootMeshes.setFocus(this.playerCombat.focus?.id ?? null);
@@ -506,6 +562,7 @@ export class Game {
         aiming: intent.aiming,
         boundaryDistance: this.map.queries.distanceToBoundary(p.x, p.z),
         warningDistance: GAME_CONFIG.boundaryWarningDistance,
+        zone: this.zoneState ? { ...this.zoneState, outside: this.zoneOutside } : null,
         spreadPx: building ? null : this.playerCombat.spreadPx,
         crosshair: weapon && !building ? (weapon.pellets > 1 ? 'shotgun' : 'default') : 'default',
         perf: showPerf ? {
@@ -531,6 +588,26 @@ export class Game {
     this.audio.setListener(cam.x, cam.y, cam.z, this.cameraRig.yaw);
     this.map.update(dt, this.engine.camera, this.player.position);
     input.endFrame();
+  }
+
+  // Safe zone: shrinks with the match time, 1 damage tick per second outside.
+  updateZone(dt) {
+    this.zoneTime += dt * this.zoneSpeed;
+    const z = this.zone.stateAt(this.zoneTime);
+    this.zoneState = z;
+    this.zoneMesh.update(dt, this.zone.center, z.radius, this.map.layout.terrain.topY - 30, 160);
+    const p = this.player.position;
+    const outside = this.player.alive && this.zone.isOutside(p.x, p.z, z.radius);
+    this.zoneOutside = outside;
+    if (!outside || z.damage <= 0) {
+      this.zoneTick = 0;
+      return;
+    }
+    this.zoneTick += dt * this.zoneSpeed;
+    while (this.zoneTick >= 1 && this.player.alive) {
+      this.zoneTick -= 1;
+      this.player.applyDamage(z.damage, { ownerName: 'la zone', zone: true });
+    }
   }
 
   // Input view with the fire button released (used right after leaving build mode).

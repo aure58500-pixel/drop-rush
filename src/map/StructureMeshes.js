@@ -1,32 +1,48 @@
-// Merges all static structures into chunked meshes (one draw call per chunk)
-// so distant chunks can be frustum culled.
+// Merges every structure shape into chunked meshes (one draw call per 64 m
+// chunk) built with PartBuilder, so distant chunks are frustum culled.
+// Water decor (fountains, waterfalls) goes into separate translucent meshes.
 import * as THREE from 'three';
-import { GeometryBuilder } from './GeometryBuilder.js';
+import { createAccumulator, emitPart, finalizeAccumulator } from '../core/geometry/PartBuilder.js';
 import { geometryFromArrays } from './geometryUtils.js';
 
-const CHUNK_SIZE = 64;
+const CHUNK = 64;
+
+function shapeToPart(s) {
+  if (s.shape === 'box') return { s: 'box', size: [s.hx * 2, s.hy * 2, s.hz * 2], p: [s.x, s.y, s.z], yaw: s.yaw, c: s.color };
+  if (s.shape === 'ramp') return { s: 'wedge', size: [s.hx * 2, s.hy * 2, s.hz * 2], p: [s.x, s.y, s.z], yaw: s.yaw, c: s.color };
+  if (s.shape === 'part') return s.part;
+  return null; // cylinders are colliders only (drawn with parts)
+}
 
 export function createStructureMeshes(shapes) {
-  const builders = new Map();
-  const decorBuilders = new Map();
+  const solid = new Map();
+  const water = new Map();
   for (const s of shapes) {
-    const key = `${Math.floor(s.x / CHUNK_SIZE)}:${Math.floor(s.z / CHUNK_SIZE)}`;
-    const target = s.shadow ? builders : decorBuilders;
-    if (!target.has(key)) target.set(key, new GeometryBuilder());
-    target.get(key).shape(s);
+    const part = shapeToPart(s);
+    if (!part) continue;
+    const key = `${Math.floor(part.p[0] / CHUNK)}:${Math.floor(part.p[2] / CHUNK)}`;
+    const target = s.water ? water : solid;
+    if (!target.has(key)) target.set(key, createAccumulator());
+    emitPart(part, target.get(key));
   }
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.02 });
   const group = new THREE.Group();
   group.name = 'structures';
-  for (const [map, shadow] of [[builders, true], [decorBuilders, false]]) {
-    for (const builder of map.values()) {
-      if (builder.triangleCount === 0) continue;
-      const mesh = new THREE.Mesh(geometryFromArrays(builder.toArrays()), material);
-      mesh.castShadow = shadow;
-      mesh.receiveShadow = true;
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const waterMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.72, depthWrite: false });
+  let triangles = 0;
+  for (const [map, mat, isWater] of [[solid, material, false], [water, waterMaterial, true]]) {
+    for (const acc of map.values()) {
+      const arrays = finalizeAccumulator(acc);
+      if (!arrays.triangles) continue;
+      triangles += arrays.triangles;
+      const mesh = new THREE.Mesh(geometryFromArrays(arrays), mat);
+      mesh.castShadow = !isWater;
+      mesh.receiveShadow = !isWater;
+      mesh.renderOrder = isWater ? 2 : 0;
       mesh.matrixAutoUpdate = false;
       group.add(mesh);
     }
   }
+  group.userData.triangles = triangles;
   return group;
 }

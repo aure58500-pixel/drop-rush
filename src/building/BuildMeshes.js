@@ -2,7 +2,7 @@
 // 1000 builds), placement animation, damage tint and the translucent preview.
 import * as THREE from 'three';
 import { BUILD_CONFIG } from '../config/buildConfig.js';
-import { GeometryBuilder } from '../map/GeometryBuilder.js';
+import { buildParts } from '../core/geometry/PartBuilder.js';
 import { geometryFromArrays } from '../map/geometryUtils.js';
 
 const _m = new THREE.Matrix4();
@@ -20,16 +20,12 @@ function easeOutBack(t) {
 }
 
 function unitBox() {
-  const g = new GeometryBuilder();
-  g.box(0, 0, 0, 0.5, 0.5, 0.5, 0, '#ffffff');
-  return geometryFromArrays(g.toArrays());
+  return geometryFromArrays(buildParts([{ s: 'box', size: [1, 1, 1], c: '#ffffff' }]));
 }
 
 // Unit wedge rising toward local +Z (same orientation as the ramp collider).
 function unitWedge() {
-  const g = new GeometryBuilder();
-  g.ramp(0, 0, 0, 0.5, 0.5, 0.5, 0, Infinity, '#ffffff');
-  return geometryFromArrays(g.toArrays());
+  return geometryFromArrays(buildParts([{ s: 'wedge', size: [1, 1, 1], c: '#ffffff' }]));
 }
 
 export class BuildMeshes {

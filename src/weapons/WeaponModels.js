@@ -2,7 +2,7 @@
 // One merged, vertex-colored geometry per weapon type, shared by every instance.
 import * as THREE from 'three';
 import { getWeapon } from '../config/weapons.js';
-import { GeometryBuilder } from '../map/GeometryBuilder.js';
+import { buildParts } from '../core/geometry/PartBuilder.js';
 import { geometryFromArrays } from '../map/geometryUtils.js';
 
 const geometryCache = new Map();
@@ -17,11 +17,10 @@ export function getWeaponGeometry(id) {
   let g = geometryCache.get(id);
   if (g) return g;
   const { model } = getWeapon(id);
-  const b = new GeometryBuilder();
-  for (const [x0, y0, z0, x1, y1, z1, key] of model.parts) {
-    b.box((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, (x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2, 0, model.colors[key] || '#888888');
-  }
-  g = geometryFromArrays(b.toArrays());
+  const parts = model.parts.map(([x0, y0, z0, x1, y1, z1, key]) => ({
+    s: 'box', size: [x1 - x0, y1 - y0, z1 - z0], p: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], c: model.colors[key] || '#888888',
+  }));
+  g = geometryFromArrays(buildParts(parts));
   geometryCache.set(id, g);
   return g;
 }
